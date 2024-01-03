@@ -59,10 +59,11 @@ class Token:
 
     def __str__(self) -> str:
         return (
-            f"Token(type={self.token_type}, literal={self.literal!r}"
+            f"Token(type={self.token_type!r}, literal={self.literal!r}"
             f", lexeme={self.lexeme!r}, line={self.line})"
         )
 
+    # For testing purposes.
     __repr__ = __str__
 
     def __eq__(self, o: "Token"):

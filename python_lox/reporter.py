@@ -1,5 +1,7 @@
 from sys import stderr as _stderr
 
+__all__ = ("Reporter",)
+
 eprint = lambda *a, **k: print(*a, **k, file=_stderr)
 
 

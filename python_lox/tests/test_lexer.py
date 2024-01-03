@@ -1,5 +1,5 @@
 from ..lexer import Lexer
-from ..lox import Lox
+from ..reporter import Reporter
 from ..token import Token, TokenType
 
 
@@ -24,7 +24,7 @@ fun hello(name) {
         Token(TokenType.RIGHT_BRACE, "}", None, 3),
         Token(TokenType.EOF, "", None, 3),
     ]
-    lexer = Lexer(source, Lox())
+    lexer = Lexer(source, Reporter())
     assert tokens == lexer.scan_tokens()
 
 
@@ -75,7 +75,7 @@ class Person {
         Token(TokenType.RIGHT_BRACE, "}", None, 8),
         Token(TokenType.EOF, "", None, 8),
     ]
-    lexer = Lexer(source, Lox())
+    lexer = Lexer(source, Reporter())
     assert tokens == lexer.scan_tokens()
 
 
@@ -128,7 +128,7 @@ I have two eyes.
         Token(TokenType.SEMICOLON, ";", None, 14),
         Token(TokenType.EOF, "", None, 15),
     ]
-    lexer = Lexer(source, Lox())
+    lexer = Lexer(source, Reporter())
     assert tokens == lexer.scan_tokens()
 
 
@@ -244,5 +244,5 @@ for (var cnt=0; cnt < 10 and age<=20; cnt = cnt+1) {
         Token(TokenType.RIGHT_BRACE, "}", None, 18),
         Token(TokenType.EOF, "", None, 19),
     ]
-    lexer = Lexer(source, Lox())
+    lexer = Lexer(source, Reporter())
     assert tokens == lexer.scan_tokens()

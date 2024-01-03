@@ -3,32 +3,44 @@ from .token import Token, TokenType
 from .keywords import keywords
 
 if ty.TYPE_CHECKING:
-    from .lox import Lox
+    from .reporter import Reporter
 else:
-    Lox = None
+    Reporter = None
 
 
 class Lexer:
-    def __init__(self, source: str, lox: Lox) -> None:
-        self.stop = len(source)
-        self.src = source
+    def __init__(self, source: str, repoter: Reporter) -> None:
+        self._scanned: bool = False
         self.tokens: list[Token] = []
-        self.current = 0
-        self.start = 0
-        self.line = 1
-        self.lox = lox
+        self.stop = len(source)
+        self.repoter = repoter
+        self._src = source
+        self._current = 0
+        self._start = 0
+        self._line = 1
+
+    @property
+    def src(self) -> str:
+        return self._src
+    
+    @property
+    def scanned(self) -> bool:
+        return self._scanned
 
     def empty(self) -> bool:
-        return self.current >= self.stop
+        return self._current >= self.stop
 
     def scan_tokens(self) -> list[Token]:
+        if self._scanned:
+            return self.tokens
         while not self.empty():
-            self.start = self.current
-            self.scan_token()
-        self.tokens.append(Token(TokenType.EOF, "", None, self.line))
+            self._start = self._current
+            self._scanchar()
+        self.tokens.append(Token(TokenType.EOF, "", None, self._line))
+        self._scanned = True
         return self.tokens
 
-    def scan_token(self):
+    def _scanchar(self):
         char = self.advance()
         match char:
             case '(': self.add_token(TokenType.LEFT_PAREN)
@@ -53,43 +65,43 @@ class Lexer:
                 else:
                     self.add_token(TokenType.SLASH)
             case '\r' | '\t' | ' ' | '\v' | '\f': pass
-            case '\n': self.line += 1
+            case '\n': self._line += 1
             case c:
                 if self.isdigit(c):
                     self.number()
                 elif self.isalpha(c):
                     self.identifier()
                 else:
-                    self.lox.reporter.error(self.line, f"Unexpected character {c!r}")
+                    self.repoter.error(self._line, f"Unexpected character {c!r}")
 
     def advance(self):
-        self.current += 1
-        return self.src[self.current - 1]
+        self._current += 1
+        return self.src[self._current - 1]
 
     def add_token(self, token_type: TokenType, literal: object = None):
-        text = self.src[self.start : self.current]
-        token = Token(token_type, text, literal, self.line)
+        text = self.src[self._start : self._current]
+        token = Token(token_type, text, literal, self._line)
         self.tokens.append(token)
 
     def match(self, expected: str):
-        if self.empty() or self.src[self.current] != expected:
+        if self.empty() or self.src[self._current] != expected:
             return False
-        self.current += 1
+        self._current += 1
         return True
 
     def peek(self) -> str | None:
-        return None if self.empty() else self.src[self.current]
+        return None if self.empty() else self.src[self._current]
 
     def string(self):
         while self.peek() != '"' and not self.empty():
             if self.peek() == "\n":
-                self.line += 1
+                self._line += 1
             self.advance()
         if self.empty():
-            self.lox.reporter.error(self.line, "Unterminated string.")
+            self.repoter.error(self._line, "Unterminated string.")
         else:
             self.advance()
-        string = self.src[self.start + 1 : self.current - 1]
+        string = self.src[self._start + 1 : self._current - 1]
         self.add_token(TokenType.STRING, string)
 
     def isdigit(self, digit: str):
@@ -102,17 +114,19 @@ class Lexer:
             self.advance()
             while self.isdigit(self.peek() or "\0"):
                 self.advance()
-        number = self.src[self.start : self.current]
+        if self.isalpha(self.peek() or '\0'):
+            self.repoter.error(self._line, "Invalid Identifier or characters in number literal.")
+        number = self.src[self._start : self._current]
         number = float(number) if "." in number else int(number)
         self.add_token(TokenType.NUMBER, number)
 
     def peek_next(self):
-        return None if self.current + 1 >= self.stop else self.src[self.current + 1]
+        return None if self._current + 1 >= self.stop else self.src[self._current + 1]
 
     def identifier(self):
         while self.isalphanumeric(self.peek() or "\0"):
             self.advance()
-        identifier = self.src[self.start : self.current]
+        identifier = self.src[self._start : self._current]
         token_type = keywords.get(identifier, TokenType.IDENTIFIER)
         self.add_token(token_type)
 
