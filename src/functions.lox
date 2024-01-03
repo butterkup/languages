@@ -1,0 +1,31 @@
+// Functions in Lox
+
+fun hello(name) {
+    print "Hello " + name + ", how was your day?";
+}
+
+fun add(a, b) {
+    return a + b;
+}
+
+fun closure_add(a) {
+    fun add_to(b) {
+        return a + b;
+    }
+    return add_to;
+}
+
+var name = "Simon Nganga";
+hello(name);
+
+var a = 10;
+var b = 20;
+var add_to = closure_add(a);
+
+if (add(a, b) != a + b) {
+    print "add error";
+}
+
+if (add_to(b) != a + b) {
+    print "closure_add error";
+}

@@ -1,0 +1,6 @@
+// Lox variables
+
+var name = "Simon";
+print "Hello " + name;
+var nothing;
+print nothing;

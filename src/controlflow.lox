@@ -1,0 +1,18 @@
+// Control flow in Lox
+
+var age = 20;
+
+if (age >= 18) {
+    print "You can vote.";
+} else {
+    print "Underage cannot vote.";
+}
+
+while (age > 18) {
+    print "age--";
+    age = age - 1;
+}
+
+for (var c = 0; c < 10; c++) {
+    print "in for loop";
+}

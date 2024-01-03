@@ -1,0 +1,27 @@
+// Lox classes and OOP constructs
+
+class Person {
+    init (name, age) {
+        this.name = name;
+        this.age = age;
+    }
+    who() {
+        print "I am " + this.name;
+    }
+}
+
+class PersonEmail < Person {
+    init(name, age, email) {
+        super.init(name, age);
+        this.email = email;
+    }
+    contact() {
+        print "You can find me via " + this.email;
+    }
+}
+
+var me = Person("Simon Nganga", 21);
+me.who();
+var him = PersonEmail("Mark John", 34, "markjohn@gmail.com");
+him.who();
+him.contact();
