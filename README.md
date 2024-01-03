@@ -17,3 +17,6 @@ Implementations.
 
 - [ ] python_lox - `Lox` implementation in `python`.
 - [ ] c_lox - `Lox` implementation in `c`.
+
+## Tools Used
+- `pytest` - for testing the python implementation of `Lox`
