@@ -14,6 +14,8 @@ class TokenType(enum.IntFlag):
     SEMICOLON = enum.auto()
     SLASH = enum.auto()
     STAR = enum.auto()
+    QMARK = enum.auto()
+    COLON = enum.auto()
     # One or two character tokens
     BANG = enum.auto()
     BANG_EQUAL = enum.auto()
@@ -23,6 +25,7 @@ class TokenType(enum.IntFlag):
     GREATER_THAN = enum.auto()
     LESS = enum.auto()
     LESS_THAN = enum.auto()
+    POW = enum.auto()
     # Literals
     IDENTIFIER = enum.auto()
     STRING = enum.auto()

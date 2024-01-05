@@ -6,7 +6,7 @@ from ..token import Token, TokenType
 def test_function_lexing():
     source = """
 fun hello(name) {
-    print "Hello " + name;
+  print "Hello " + name;
 }
     """.strip()
     tokens = [
@@ -31,12 +31,12 @@ fun hello(name) {
 def test_class_lexing():
     source = """
 class Person {
-    init(name) {
-        this.name = name;
-    }
-    hello(name) {
-        print "Hello " + name + ", my name is " + this.name;
-    }
+  init(name) {
+    this.name = name;
+  }
+  hello(name) {
+    print "Hello " + name + ", my name is " + this.name;
+  }
 }
     """.strip()
     tokens = [
@@ -136,20 +136,20 @@ def test_control_flow_lexing():
     source = """// Tricky comment.
 var age = 20;
 if (age >= 30) {
-    print "Too old";
+  print "Too old";
 } else if (age<20) {
-    print "Too young";
+  print "Too young";
 } else {
-    print "perfect";
+  print "perfect";
 }
 while (age>=20) {
-    age = age - 1;
+  age = age - 1;
 }
 for (var cnt=0; cnt < 10 and age<=20; cnt = cnt+1) {
-    print "Counting";
-    if (cnt == 5 or age==15) {
-        print "booya!!";
-    }
+  print "Counting";
+  if (cnt == 5 or age==15) {
+    print "booya!!";
+  }
 } // last comment
     """
     tokens = [
@@ -243,6 +243,69 @@ for (var cnt=0; cnt < 10 and age<=20; cnt = cnt+1) {
         Token(TokenType.RIGHT_BRACE, "}", None, 17),
         Token(TokenType.RIGHT_BRACE, "}", None, 18),
         Token(TokenType.EOF, "", None, 19),
+    ]
+    lexer = Lexer(source, Reporter())
+    assert tokens == lexer.scan_tokens()
+
+
+def test_operators_lexing():
+    source = """
+1 + 2 + 3;
+3 - 2 + 1;
+1 ** 2 * 3 + 4 * * 5 + 6; // o
+1 * * 2; // diferentiate from star-star or pow operators
+2 > 1?"okay":"lie";
+1 == 2 // will also test !=, <=, >=
+1 = = 2; // will also test < =, > =
+""".strip()
+    tokens = [
+        Token(TokenType.NUMBER, "1", 1, 1),
+        Token(TokenType.PLUS, "+", None, 1),
+        Token(TokenType.NUMBER, "2", 2, 1),
+        Token(TokenType.PLUS, "+", None, 1),
+        Token(TokenType.NUMBER, "3", 3, 1),
+        Token(TokenType.SEMICOLON, ";", None, 1),
+        Token(TokenType.NUMBER, "3", 3, 2),
+        Token(TokenType.MINUS, "-", None, 2),
+        Token(TokenType.NUMBER, "2", 2, 2),
+        Token(TokenType.PLUS, "+", None, 2),
+        Token(TokenType.NUMBER, "1", 1, 2),
+        Token(TokenType.SEMICOLON, ";", None, 2),
+        Token(TokenType.NUMBER, "1", 1, 3),
+        Token(TokenType.POW, "**", None, 3),
+        Token(TokenType.NUMBER, "2", 2, 3),
+        Token(TokenType.STAR, "*", None, 3),
+        Token(TokenType.NUMBER, "3", 3, 3),
+        Token(TokenType.PLUS, "+", None, 3),
+        Token(TokenType.NUMBER, "4", 4, 3),
+        Token(TokenType.STAR, "*", None, 3),
+        Token(TokenType.STAR, "*", None, 3),
+        Token(TokenType.NUMBER, "5", 5, 3),
+        Token(TokenType.PLUS, "+", None, 3),
+        Token(TokenType.NUMBER, "6", 6, 3),
+        Token(TokenType.SEMICOLON, ";", None, 3),
+        Token(TokenType.NUMBER, "1", 1, 4),
+        Token(TokenType.STAR, "*", None, 4),
+        Token(TokenType.STAR, "*", None, 4),
+        Token(TokenType.NUMBER, "2", 2, 4),
+        Token(TokenType.SEMICOLON, ";", None, 4),
+        Token(TokenType.NUMBER, "2", 2, 5),
+        Token(TokenType.GREATER, ">", None, 5),
+        Token(TokenType.NUMBER, "1", 1, 5),
+        Token(TokenType.QMARK, "?", None, 5),
+        Token(TokenType.STRING, '"okay"', "okay", 5),
+        Token(TokenType.COLON, ":", None, 5),
+        Token(TokenType.STRING, '"lie"', "lie", 5),
+        Token(TokenType.SEMICOLON, ";", None, 5),
+        Token(TokenType.NUMBER, "1", 1, 6),
+        Token(TokenType.EQUAL_EQUAL, "==", None, 6),
+        Token(TokenType.NUMBER, "2", 2, 6),
+        Token(TokenType.NUMBER, "1", 1, 7),
+        Token(TokenType.EQUAL, "=", None, 7),
+        Token(TokenType.EQUAL, "=", None, 7),
+        Token(TokenType.NUMBER, "2", 2, 7),
+        Token(TokenType.SEMICOLON, ";", None, 7),
+        Token(TokenType.EOF, "", None, 7),
     ]
     lexer = Lexer(source, Reporter())
     assert tokens == lexer.scan_tokens()

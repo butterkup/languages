@@ -1,4 +1,4 @@
-from python_lox import Lox
+from .lox import Lox
 
 
 def main(argv: list[str]):

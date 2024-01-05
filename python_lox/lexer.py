@@ -1,6 +1,6 @@
 import typing as ty
 from .token import Token, TokenType
-from .keywords import keywords
+from .category import keywords
 
 if ty.TYPE_CHECKING:
     from .reporter import Reporter
@@ -35,12 +35,12 @@ class Lexer:
             return self.tokens
         while not self.empty():
             self._start = self._current
-            self._scanchar()
+            self._scantoken()
         self.tokens.append(Token(TokenType.EOF, "", None, self._line))
         self._scanned = True
         return self.tokens
 
-    def _scanchar(self):
+    def _scantoken(self):
         char = self.advance()
         match char:
             case '(': self.add_token(TokenType.LEFT_PAREN)
@@ -48,11 +48,13 @@ class Lexer:
             case '{': self.add_token(TokenType.LEFT_BRACE)
             case '}': self.add_token(TokenType.RIGHT_BRACE)
             case ',': self.add_token(TokenType.COMMA)
+            case '?': self.add_token(TokenType.QMARK)
+            case ':': self.add_token(TokenType.COLON)
             case '.': self.add_token(TokenType.DOT)
             case '-': self.add_token(TokenType.MINUS)
             case '+': self.add_token(TokenType.PLUS)
             case ';': self.add_token(TokenType.SEMICOLON)
-            case '*': self.add_token(TokenType.STAR)
+            case '*': self.add_token(TokenType.POW if self.match('*') else TokenType.STAR)
             case '!': self.add_token(TokenType.BANG_EQUAL if self.match('=') else TokenType.BANG)
             case '<': self.add_token(TokenType.LESS_THAN if self.match('=') else TokenType.LESS)
             case '>': self.add_token(TokenType.GREATER_THAN if self.match('=') else TokenType.GREATER)
@@ -61,6 +63,8 @@ class Lexer:
             case '/':
                 if self.match('/'):
                     while self.peek() != '\n':
+                        if self.empty():
+                            break
                         self.advance()
                 else:
                     self.add_token(TokenType.SLASH)
@@ -75,7 +79,7 @@ class Lexer:
                     self.repoter.error(self._line, f"Unexpected character {c!r}")
 
     def advance(self):
-        self._current += 1
+        if not self.empty(): self._current += 1
         return self.src[self._current - 1]
 
     def add_token(self, token_type: TokenType, literal: object = None):
