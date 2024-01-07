@@ -1,26 +1,19 @@
+from .base import StmtVisitor, ExprVisitor
 from .token import TokenType, Token
-from .reporter import Reporter
-from .base import Visitor
+from .env import Environment
+from .exc import *
 import typing
 
-
-class LoxRuntimeError(Exception):
-    def __init__(self, operator: Token, message: str) -> None:
-        self.operator = operator
-        self.message = message
-
-
-class LoxTypeError(LoxRuntimeError):
-    ...
+if typing.TYPE_CHECKING:
+    from .reporter import Reporter
+else:
+    Reporter = None
 
 
-class LoxZeroDivisionError(LoxRuntimeError):
-    ...
-
-
-class ASTInterpreter(Visitor):
-    def __init__(self, reporter: Reporter) -> None:
+class ASTInterpreter(StmtVisitor, ExprVisitor):
+    def __init__(self, reporter: Reporter, env: Environment) -> None:
         self.reporter = reporter
+        self.env = env
 
     def visit_binary(self, expr):
         right = self.evaluate(expr.right)
@@ -133,8 +126,38 @@ class ASTInterpreter(Visitor):
     def check_strings(self, operator: Token, right, left):
         self._check_type(operator, "string", right, left, str)
 
-    def interpret(self, expr):
+    def interpret(self, statements):
         try:
-            return self.reporter.string(self.evaluate(expr))
+            for statement in statements:
+                statement.accept(self)
         except LoxRuntimeError as e:
             self.reporter.runtime_error(e)
+
+    def visit_expression(self, expr):
+        self.evaluate(expr.expression)
+
+    def visit_print(self, expr):
+        value = self.evaluate(expr.expression)
+        toprint = self.reporter.string(value)
+        print(toprint)
+
+    def visit_variable(self, expr):
+        return self.env.getdef(expr.value)
+
+    def visit_var(self, stmt):
+        value = self.evaluate(stmt.expression)
+        self.env.define(stmt.name, value, True)
+
+    def visit_assign(self, expr):
+        value = self.evaluate(expr.expression)
+        self.env.define(expr.name, value)
+        return value
+
+    def visit_block(self, stmt):
+        previous = self.env
+        try:
+            self.env = Environment(previous)
+            for statement in stmt.statements:
+                statement.accept(self)
+        finally:
+            self.env = previous

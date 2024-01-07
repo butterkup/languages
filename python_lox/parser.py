@@ -1,18 +1,9 @@
-from .reporter import Reporter
-from .token import Token, TokenType
-from .ast import Binary, Unary, Literal, Grouping, Ternary
+from .expr_ast import Binary, Unary, Literal, Grouping, Ternary, Variable, Assign
 from .category import BINARY_OPERATORS, COMPARISON_OPERATORS, EQUALITY_OPERATORS
-
-
-class ParserError(Exception):
-    def __init__(self, token: Token, message: str) -> None:
-        super().__init__(self, message, token)
-        self.message = message
-        self.token = token
-
-
-class MissingExpr(ParserError):
-    ...
+from .stmt_ast import Expression, Print, Var, Block
+from .exc import ParserError, MissingExpr
+from .token import Token, TokenType
+from .reporter import Reporter
 
 
 class Parser:
@@ -22,13 +13,59 @@ class Parser:
         self.current = 0
 
     def parse(self):
+        statements = []
         try:
-            if self.empty():
-                return
-            self.current = 0
-            return self.expression()
-        except ParserError as e:
+            while not self.empty():
+                decl = self.declaration()
+                statements.append(decl)
+        except ParserError:
             ...
+        return statements
+
+    def declaration(self):
+        try:
+            if self.match(TokenType.VAR):
+                return self.var_stmt()
+            return self.statement()
+        except ParserError:
+            self.synchronize()
+            if self.empty():
+                raise
+        return self.declaration()
+
+    def statement(self):
+        if self.match(TokenType.PRINT):
+            return self.print_stmt()
+        if self.match(TokenType.LEFT_BRACE):
+            return self.block_stmt()
+        return self.expr_stmt()
+
+    def block_stmt(self):
+        statements = []
+        while not self.check(TokenType.RIGHT_BRACE) and not self.empty():
+            statements.append(self.declaration())
+        self.consume(TokenType.RIGHT_BRACE, "Expected '}' to close opened block.")
+        return Block(statements)
+
+    def print_stmt(self):
+        expr = self.expression()
+        self.consume(TokenType.SEMICOLON, "Expected ';' after print statement.")
+        return Print(expr)
+
+    def expr_stmt(self):
+        expr = (
+            Expression(Literal(None))
+            if self.peek().token_type == TokenType.SEMICOLON
+            else self.expression()
+        )
+        self.consume(TokenType.SEMICOLON, "Expected ';' after expression statement.")
+        return Expression(expr)  # type: ignore
+
+    def var_stmt(self):
+        name = self.consume(TokenType.IDENTIFIER, "Expected a variable name.")
+        init = self.expression() if self.match(TokenType.EQUAL) else Literal(None)
+        self.consume(TokenType.SEMICOLON, "Expected ';' after var statement.")
+        return Var(name, init)
 
     def expression(self):
         if self.peek().token_type in BINARY_OPERATORS:
@@ -36,7 +73,17 @@ class Parser:
                 self.peek(),
                 f"Left operand for binary operation ({self.peek().lexeme}) missing.",
             )
-        return self.ternary()
+        return self.assignment()
+
+    def assignment(self):
+        expr = self.ternary()
+        if self.match(TokenType.EQUAL):
+            equals = self.previous()
+            if isinstance(expr, Variable):
+                value = self.assignment()
+                return Assign(expr.value, value)
+            self.error(equals, "Expected an assignable target.")
+        return expr
 
     def ternary(self):
         expr = self.equality()
@@ -105,6 +152,8 @@ class Parser:
             expr = self.expression()
             self.consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.")
             return Grouping(expr)
+        if self.match(TokenType.IDENTIFIER):
+            return Variable(self.previous())
         raise self.error(
             self.peek(),
             f"Expected an expression, got {self.peek().lexeme!r}",

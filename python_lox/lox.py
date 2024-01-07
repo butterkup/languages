@@ -1,6 +1,6 @@
 from .interpreter import ASTInterpreter
 from .reporter import Reporter, eprint
-from .base import ASTPrinter
+from .env import Environment
 from .parser import Parser
 from pathlib import Path
 from .lexer import Lexer
@@ -9,6 +9,7 @@ from .lexer import Lexer
 class Lox:
     def __init__(self) -> None:
         self.reporter = Reporter()
+        self.env = Environment()
 
     def run_file(self, file: str | Path, *argv: str):
         content = Path(str(file)).read_text("utf-8")
@@ -22,31 +23,26 @@ class Lox:
         # Tokenizer -> Tokens
         lexer = Lexer(src, self.reporter)
         tokens = lexer.scan_tokens()
-        # for token in tokens:
-        #     print(token)
+
         if self.reporter.had_error:
             eprint("Errors occurred in the tokenizing stage, aborting!")
             return
 
         # Parser -> AST
         parser = Parser(tokens, self.reporter)
-        ast = parser.parse()
+        program = parser.parse()
 
         if self.reporter.had_error:
             eprint("Errors occurred in the parsing stage, aborting!")
             return
 
         # Executor -> TreeWalkInterpreter
-        if ast is not None:
-            evaluator = ASTInterpreter(self.reporter)
-            value = evaluator.interpret(ast)
+        evaluator = ASTInterpreter(self.reporter, self.env)
+        evaluator.interpret(program)
 
-            if self.reporter.had_runtime_error:
-                eprint("Errors occurred in the interpreter stage, aborting!")
-                return
-
-            # Output the result of the expression
-            print(value)
+        if self.reporter.had_runtime_error:
+            eprint("Errors occurred in the interpreter stage, aborting!")
+            return
 
     def repr(self, *argv):
         buffer, linenumber, prompt = "", 1, "   1 # "
@@ -58,6 +54,7 @@ class Lox:
                 if line.lower() in (".exit", ".quit"):
                     exit(0)
                 if line.lower() == ".clear":
+                    linenumber += 1
                     print("\033[H\033[2J\033[3J")
                     continue
                 if line.endswith(":"):

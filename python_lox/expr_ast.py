@@ -1,16 +1,14 @@
 import typing
+from .base import ExprVisitor as Visitor
 
-
-__all__ = 'Binary', 'Grouping', 'Literal', 'Unary', 'Ternary'
+__all__ = 'Binary', 'Grouping', 'Literal', 'Unary', 'Ternary', 'Variable', 'Assign'
 
 if typing.TYPE_CHECKING:
     from .token import Token
     from .base import Expr
-    from .base import Visitor
 else:
     Token = None
     Expr = None
-    Visitor = None
 
 
 class Binary:
@@ -56,3 +54,20 @@ class Ternary:
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):
         return visitor.visit_ternary(self)
+
+
+class Variable:
+    def __init__(self: 'typing.Self', value: 'Token') -> None:
+        self.value = value
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_variable(self)
+
+
+class Assign:
+    def __init__(self: 'typing.Self', name: 'Token', expression: 'Expr') -> None:
+        self.name = name
+        self.expression = expression
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_assign(self)

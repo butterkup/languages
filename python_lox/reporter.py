@@ -32,7 +32,7 @@ class Reporter:
         return str(value)
 
     def runtime_error(self, error):
-        self.report_error(error.operator.line, error.__class__.__name__, error.message)
+        self.report_error(error.token.line, error.__class__.__name__, error.message)
 
     def reset(self):
         self.had_error = False
