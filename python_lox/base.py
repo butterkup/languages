@@ -1,12 +1,5 @@
 import typing
 
-if typing.TYPE_CHECKING:
-    from .env import Environment
-    from .reporter import Reporter
-else:
-    Environment = None
-    Reporter = None
-
 
 class ExprVisitor(typing.Protocol):
     def visit_binary(self, expr):
@@ -29,8 +22,11 @@ class ExprVisitor(typing.Protocol):
 
     def visit_assign(self, expr):
         ...
-    
+
     def visit_logical(self, expr):
+        ...
+
+    def visit_call(self, expr):
         ...
 
 
@@ -43,14 +39,20 @@ class StmtVisitor(typing.Protocol):
 
     def visit_var(self, stmt):
         ...
-    
+
     def visit_block(self, stmt):
         ...
-    
+
     def visit_if(self, stmt):
         ...
-    
+
     def visit_while(self, stmt):
+        ...
+
+    def visit_function(self, stmt):
+        ...
+
+    def visit_return(self, stmt):
         ...
 
 
@@ -63,3 +65,11 @@ class Stmt(typing.Protocol):
     def accept(self, visitor: "StmtVisitor"):
         ...
 
+
+@typing.runtime_checkable
+class Callable(typing.Protocol):
+    def call(self, visitor: StmtVisitor, args: list[object]):
+        ...
+
+    def arity(self) -> int:
+        ...

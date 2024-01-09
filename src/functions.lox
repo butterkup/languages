@@ -1,31 +1,83 @@
 // Functions in Lox
 
+fun addX(x) {
+  fun addY(y) {
+    return x + y;
+  }
+  return addY;
+}
+
+var add5 = addX(5);
+print add5(10);
+
 fun hello(name) {
     print "Hello " + name + ", how was your day?";
 }
 
-fun add(a, b) {
-    return a + b;
+// hello("Lydia");
+
+fun greet(func, name, count) {
+  while (count > 0) {
+    func(name);
+    count = count - 1;
+  }
 }
 
-fun closure_add(a) {
-    fun add_to(b) {
-        return a + b;
-    }
-    return add_to;
+fun factorial(n) {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
 }
 
-var name = "Simon Nganga";
-hello(name);
+// for (var n = 0; n < 10; n = n + 1)
+//   print string(n) + "! = " + string(factorial(n));
 
-var a = 10;
-var b = 20;
-var add_to = closure_add(a);
-
-if (add(a, b) != a + b) {
-    print "add error";
+fun count(n) {
+  if (n > 1) count(n - 1);
+  print "Current: n=" + string(n);
 }
 
-if (add_to(b) != a + b) {
-    print "closure_add error";
-}
+// count(5);
+// 
+// print count;
+// print hello;
+// print greet;
+
+// fun add(a, b) {
+//     return a + b;
+// }
+
+// hello("Simon Nganga");
+// hello("Faith Njeri");
+// hello("Darius Kipesa");
+// hello("Harrison Kariuki");
+// hello("Obed Mireri");
+
+// greet(hello, "Simon Nganga", 1);
+// greet(hello, "Faith Njeri", 2);
+// greet(hello, "Darius Kipesa", 3);
+// greet(hello, "Harrison Kariuki", 2);
+// greet(hello, "Obed Mireri", 1);
+
+
+// 
+// fun closure_add(a) {
+//     fun add_to(b) {
+//         return a + b;
+//     }
+//     return add_to;
+// }
+// 
+// var name = "Simon Nganga";
+// hello(name);
+// 
+// var a = 10;
+// var b = 20;
+// var add_to = closure_add(a);
+// 
+// if (add(a, b) != a + b) {
+//     print "add error";
+// }
+// 
+// if (add_to(b) != a + b) {
+//     print "closure_add error";
+// }

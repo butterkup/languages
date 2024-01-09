@@ -30,8 +30,6 @@ class Reporter:
             return "nil"
         elif isinstance(value, bool):
             return str(value).lower()
-        elif isinstance(value, str):
-            return f'"{value}"'
         return str(value)
 
     def runtime_error(self, error):

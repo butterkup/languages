@@ -1,7 +1,7 @@
 import typing
 
 
-__all__ = 'Expression', 'Print', 'Var', 'Block', 'If', 'While'
+__all__ = 'Expression', 'Print', 'Var', 'Block', 'If', 'While', 'Function', 'Return'
 
 if typing.TYPE_CHECKING:
     from .base import Expr
@@ -41,7 +41,7 @@ class Var:
 
 
 class Block:
-    def __init__(self: 'typing.Self', statements: 'list') -> None:
+    def __init__(self: 'typing.Self', statements: 'list[Stmt]') -> None:
         self.statements = statements
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):
@@ -65,3 +65,22 @@ class While:
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):
         return visitor.visit_while(self)
+
+
+class Function:
+    def __init__(self: 'typing.Self', name: 'Token', params: 'list[Token]', body: 'Block') -> None:
+        self.name = name
+        self.params = params
+        self.body = body
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_function(self)
+
+
+class Return:
+    def __init__(self: 'typing.Self', keyword: 'Token', value: 'Expr') -> None:
+        self.keyword = keyword
+        self.value = value
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_return(self)

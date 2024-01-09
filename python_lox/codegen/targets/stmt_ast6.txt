@@ -5,3 +5,4 @@ Var:Token name,Expr expression
 Block:list[Stmt] statements
 If:Expr condition,Stmt then_,Stmt|None else_
 While:Expr condition,Stmt body
+Function:Token name,list[Token] params,Block body

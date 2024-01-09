@@ -1,5 +1,6 @@
-from .base import StmtVisitor, ExprVisitor
+from .base import StmtVisitor, ExprVisitor, Callable
 from .token import TokenType, Token
+from .calls import LoxFunction
 from .env import Environment
 from .exc import *
 import typing
@@ -11,9 +12,10 @@ else:
 
 
 class ASTInterpreter(StmtVisitor, ExprVisitor):
-    def __init__(self, reporter: Reporter, env: Environment) -> None:
+    def __init__(self, reporter: Reporter, globals: Environment | None = None) -> None:
         self.reporter = reporter
-        self.env = env
+        self.globals = Environment() if globals is None else globals
+        self.env = self.globals
 
     def visit_binary(self, expr):
         right = self.evaluate(expr.right)
@@ -181,3 +183,24 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
     def visit_while(self, stmt):
         while self.is_truthy(stmt.condition.accept(self)):
             stmt.body.accept(self)
+
+    def visit_call(self, expr):
+        callee = self.evaluate(expr.callee)
+        if not isinstance(callee, Callable):
+            raise LoxTypeError(
+                expr.open_paren, f"{self.reporter.string(callee)} is not callable."
+            )
+        args = [arg.accept(self) for arg in expr.arguments]
+        if callee.arity() != -1 and len(args) != callee.arity():
+            raise LoxTypeError(
+                expr.open_paren,
+                f"expected {callee.arity()} arguments but received {len(args)}.",
+            )
+        return callee.call(self, args)
+
+    def visit_function(self, stmt):
+        function = LoxFunction(stmt, self.env)
+        self.env.define(stmt.name, function, True)
+
+    def visit_return(self, stmt):
+        raise ReturnValue(stmt.value.accept(self))

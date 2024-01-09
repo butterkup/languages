@@ -6,14 +6,23 @@ else:
     Token = None
 
 
-class LoxError(Exception):
+class BaseLoxError(Exception):
+    ...
+
+
+class LoxError(BaseLoxError):
     def __init__(self, token: Token, message: str) -> None:
         self.token = token
         self.message = message
 
 
-class LoxRuntimeError(Exception):
+class LoxRuntimeError(LoxError):
     ...
+
+
+class ReturnValue(BaseLoxError):
+    def __init__(self, value) -> None:
+        self.return_value = value
 
 
 class LoxTypeError(LoxRuntimeError):

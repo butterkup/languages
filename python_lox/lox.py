@@ -1,16 +1,17 @@
-from .debug import StmtPrinter as ASTInterpreter
-# from .interpreter import ASTInterpreter
+# from .debug import StmtPrinter as ASTInterpreter
+from .interpreter import ASTInterpreter
 from .reporter import Reporter, eprint
 from .env import Environment
 from .parser import Parser
 from .lexer import Lexer
+from .globals import getglobals
 from pathlib import Path
 
 
 class Lox:
     def __init__(self) -> None:
         self.reporter = Reporter()
-        self.env = Environment()
+        self.env = Environment(getglobals(self.reporter.string))
 
     def run_file(self, file: str | Path, *argv: str):
         content = Path(str(file)).read_text("utf-8")

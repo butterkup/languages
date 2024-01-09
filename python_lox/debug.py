@@ -7,7 +7,7 @@ if ty.TYPE_CHECKING:
 else:
     Reporter = Environment = None
 
-PARENS = True
+PARENS = False
 
 
 def parens(func):
@@ -60,6 +60,11 @@ class ExprPrinter(ExprVisitor):
     def visit_logical(self, expr):
         return self.visit_binary(expr)
 
+    def visit_call(self, expr):
+        callee = expr.callee.accept(self)
+        args = ", ".join([arg.accept(self) for arg in expr.arguments])
+        return f"{callee}({args})"
+
 
 class StmtPrinter(ExprPrinter, StmtVisitor):
     def visit_block(self, stmt):
@@ -90,5 +95,13 @@ class StmtPrinter(ExprPrinter, StmtVisitor):
         )
 
     def interpret(self, program):
-        for statement in program:
-            print(statement.accept(self))
+        print("\n".join([s.accept(self) for s in program]))
+
+    def visit_function(self, stmt):
+        name = stmt.name.lexeme
+        body = " " + stmt.body.accept(self) if stmt.body.statements else "{}"
+        params = [param.lexeme for param in stmt.params]
+        return f'fun {name}({", ".join(params)}){body}'
+
+    def visit_return(self, stmt):
+        return f"return {stmt.value.accept(self)};"

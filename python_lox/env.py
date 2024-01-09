@@ -14,9 +14,9 @@ class Environment(dict[str, object]):
         self.outer = outer
 
     def define(self, name: Token, value: object, new=False):
-        if name.lexeme in self or new:
+        if new or (name.lexeme in self):
             self[name.lexeme] = value
-        elif self.outer:
+        elif self.outer is not None:
             self.outer.define(name, value)
         else:
             self.undefined(name)
@@ -24,7 +24,7 @@ class Environment(dict[str, object]):
     def getdef(self, name: Token) -> object:
         value = self.get(name.lexeme, sentinel)
         if value is sentinel:
-            if self.outer:
+            if self.outer is not None:
                 return self.outer.getdef(name)
             self.undefined(name)
         return value

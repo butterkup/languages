@@ -7,9 +7,10 @@ from .expr_ast import (
     Variable,
     Assign,
     Logical,
+    Call,
 )
 from .category import BINARY_OPERATORS, COMPARISON_OPERATORS, EQUALITY_OPERATORS
-from .stmt_ast import Expression, Print, Var, Block, If, While
+from .stmt_ast import Expression, Print, Var, Block, If, While, Function, Return
 from .exc import ParserError, MissingExpr
 from .token import Token, TokenType
 from .reporter import Reporter
@@ -35,6 +36,8 @@ class Parser:
         try:
             if self.match(TokenType.VAR):
                 return self.var_stmt()
+            if self.match(TokenType.FUN):
+                return self.fun_stmt()
             return self.statement()
         except ParserError:
             self.synchronize()
@@ -53,7 +56,32 @@ class Parser:
             return self.while_stmt()
         if self.match(TokenType.FOR):
             return self.for_stmt()
+        if self.match(TokenType.RETURN):
+            return self.return_stmt()
         return self.expr_stmt()
+
+    def return_stmt(self):
+        keyword = self.previous()
+        value = Literal(None) if self.check(TokenType.SEMICOLON) else self.expression()
+        self.consume(
+            TokenType.SEMICOLON, "Expected ';' at the end of the return statement."
+        )
+        return Return(keyword, value)
+
+    def fun_stmt(self):
+        if not self.check(TokenType.IDENTIFIER):
+            raise ParserError(self.peek(), "Expected an identifier after fun keyword.")
+        fname = self.advance()
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after function identifier.")
+        parameters = []
+        while self.match(TokenType.IDENTIFIER):
+            parameters.append(self.previous())
+            self.match(TokenType.COMMA)
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after function parameters.")
+        self.consume(
+            TokenType.LEFT_BRACE, "Expected '{' after function parameters."
+        )
+        return Function(fname, parameters, self.block_stmt())
 
     def block_stmt(self):
         statements = []
@@ -99,6 +127,7 @@ class Parser:
 
     def for_stmt(self):
         self.consume(TokenType.LEFT_PAREN, "Expected '(' after for keyword.")
+        hasinit = not self.check(TokenType.SEMICOLON)
         init = self.var_stmt() if self.match(TokenType.VAR) else self.expr_stmt()
         cond = (
             Literal(True)
@@ -115,7 +144,7 @@ class Parser:
             else:
                 body = Block([body, incr])
         body = While(cond, body)
-        if isinstance(init, Var):
+        if hasinit:
             body = Block([init, body])
         return body
 
@@ -203,7 +232,20 @@ class Parser:
                     f"Right operand for unary operator ({operator.lexeme}) missing.",
                 )
                 raise
-        return self.primary()
+        return self.call()
+
+    def call(self):
+        callee = self.primary()
+        if self.match(TokenType.LEFT_PAREN):
+            open_paren = self.previous()
+            arguments = []
+            if not self.check(TokenType.RIGHT_PAREN):
+                arguments.append(self.expression())
+                while self.match(TokenType.COMMA):
+                    arguments.append(self.expression())
+            self.consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments.")
+            return Call(callee, open_paren, arguments, self.previous())
+        return callee
 
     def primary(self):
         if self.match(TokenType.FALSE):
