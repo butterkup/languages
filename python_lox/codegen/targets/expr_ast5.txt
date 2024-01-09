@@ -1,0 +1,9 @@
+expr_ast.py:.token,Token,,:.base,Expr,,:.base,ExprVisitor,Visitor,,
+Binary:Expr left,Token operator,Expr right
+Grouping:Expr expression
+Literal:object value
+Unary:Token operator,Expr right
+Ternary:Expr condition,Expr ontrue,Expr onfalse
+Variable:Token value
+Assign:Token name,Expr expression
+Logical:Expr left,Token operator,Expr right

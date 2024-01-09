@@ -1,9 +1,10 @@
-from .interpreter import ASTInterpreter
+from .debug import StmtPrinter as ASTInterpreter
+# from .interpreter import ASTInterpreter
 from .reporter import Reporter, eprint
 from .env import Environment
 from .parser import Parser
-from pathlib import Path
 from .lexer import Lexer
+from pathlib import Path
 
 
 class Lox:

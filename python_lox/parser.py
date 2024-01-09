@@ -1,6 +1,15 @@
-from .expr_ast import Binary, Unary, Literal, Grouping, Ternary, Variable, Assign
+from .expr_ast import (
+    Binary,
+    Unary,
+    Literal,
+    Grouping,
+    Ternary,
+    Variable,
+    Assign,
+    Logical,
+)
 from .category import BINARY_OPERATORS, COMPARISON_OPERATORS, EQUALITY_OPERATORS
-from .stmt_ast import Expression, Print, Var, Block
+from .stmt_ast import Expression, Print, Var, Block, If, While
 from .exc import ParserError, MissingExpr
 from .token import Token, TokenType
 from .reporter import Reporter
@@ -38,6 +47,12 @@ class Parser:
             return self.print_stmt()
         if self.match(TokenType.LEFT_BRACE):
             return self.block_stmt()
+        if self.match(TokenType.IF):
+            return self.if_stmt()
+        if self.match(TokenType.WHILE):
+            return self.while_stmt()
+        if self.match(TokenType.FOR):
+            return self.for_stmt()
         return self.expr_stmt()
 
     def block_stmt(self):
@@ -52,9 +67,17 @@ class Parser:
         self.consume(TokenType.SEMICOLON, "Expected ';' after print statement.")
         return Print(expr)
 
+    def if_stmt(self):
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after the if keyword.")
+        condition = self.expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after if expression.")
+        then_ = self.statement()
+        else_ = self.statement() if self.match(TokenType.ELSE) else None
+        return If(condition, then_, else_)
+
     def expr_stmt(self):
         expr = (
-            Expression(Literal(None))
+            Literal(None)
             if self.peek().token_type == TokenType.SEMICOLON
             else self.expression()
         )
@@ -67,6 +90,35 @@ class Parser:
         self.consume(TokenType.SEMICOLON, "Expected ';' after var statement.")
         return Var(name, init)
 
+    def while_stmt(self):
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after the while statement.")
+        condition = self.expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after the while condition.")
+        body = self.statement()
+        return While(condition, body)
+
+    def for_stmt(self):
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after for keyword.")
+        init = self.var_stmt() if self.match(TokenType.VAR) else self.expr_stmt()
+        cond = (
+            Literal(True)
+            if self.match(TokenType.SEMICOLON)
+            else self.expr_stmt().expression
+        )
+        incr = None if self.check(TokenType.RIGHT_PAREN) else self.expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after for condition.")
+        body = self.statement()
+        if incr is not None:
+            incr = Expression(incr)
+            if isinstance(body, Block):
+                body.statements.append(incr)
+            else:
+                body = Block([body, incr])
+        body = While(cond, body)
+        if isinstance(init, Var):
+            body = Block([init, body])
+        return body
+
     def expression(self):
         if self.peek().token_type in BINARY_OPERATORS:
             raise self.error(
@@ -76,7 +128,7 @@ class Parser:
         return self.assignment()
 
     def assignment(self):
-        expr = self.ternary()
+        expr = self.logic_or()
         if self.match(TokenType.EQUAL):
             equals = self.previous()
             if isinstance(expr, Variable):
@@ -95,6 +147,18 @@ class Parser:
             )
             onfalse = self.equality()
             return Ternary(expr, ontrue, onfalse)
+        return expr
+
+    def logic_or(self):
+        expr = self.logic_and()
+        while self.match(TokenType.OR):
+            expr = Logical(expr, self.previous(), self.logic_or())
+        return expr
+
+    def logic_and(self):
+        expr = self.ternary()
+        while self.match(TokenType.AND):
+            expr = Logical(expr, self.previous(), self.logic_and())
         return expr
 
     def _binary(self, nexttoken, *optypes: TokenType):

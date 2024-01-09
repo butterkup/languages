@@ -29,6 +29,9 @@ class ExprVisitor(typing.Protocol):
 
     def visit_assign(self, expr):
         ...
+    
+    def visit_logical(self, expr):
+        ...
 
 
 class StmtVisitor(typing.Protocol):
@@ -43,6 +46,12 @@ class StmtVisitor(typing.Protocol):
     
     def visit_block(self, stmt):
         ...
+    
+    def visit_if(self, stmt):
+        ...
+    
+    def visit_while(self, stmt):
+        ...
 
 
 class Expr(typing.Protocol):
@@ -50,37 +59,7 @@ class Expr(typing.Protocol):
         ...
 
 
-class ASTPrinter(ExprVisitor):
-    def __init__(self, reporter: Reporter, env: Environment) -> None:
-        self.env = env
-        self.reporter = reporter
+class Stmt(typing.Protocol):
+    def accept(self, visitor: "StmtVisitor"):
+        ...
 
-    def visit_binary(self, expr):
-        right = expr.right.accept(self)
-        left = expr.left.accept(self)
-        return f"{expr.operator.lexeme}({left}, {right})"
-
-    def visit_grouping(self, expr):
-        return f"G({expr.expression.accept(self)})"
-
-    def visit_literal(self, expr):
-        return str(expr.value)
-
-    def visit_unary(self, expr):
-        return f"({expr.operator.lexeme}{expr.right.accept(self)})"
-
-    def visit_ternary(self, expr):
-        onfalse = expr.onfalse.accept(self)
-        ontrue = expr.ontrue.accept(self)
-        cond = expr.condition.accept(self)
-        return f"({cond} ? {ontrue} : {onfalse})"
-
-    def visit_assign(self, expr):
-        name = expr.name.lexeme
-        value = expr.expression
-        return f"Assign({name} = {value.accept(self)})"
-
-    def visit_variable(self, expr):
-        name = expr.value.lexeme
-        value = self.env.getdef(expr.value)
-        return f"Var({name} -> {self.reporter.string(value)})"

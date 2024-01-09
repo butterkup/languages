@@ -13,11 +13,14 @@ class Reporter:
 
     def report(self, line: int, where: str, message: str):
         self.had_error = True
-        eprint(f"[line {line}] Error {where}: {message}")
+        self._print(f"[line {line}] Error {where}: {message}")
 
     def report_error(self, line: int, error: str, message: str):
         self.had_runtime_error = True
-        eprint(f"[line {line}]: Error: {error}: {message}")
+        self._print(f"[line {line}]: Error: {error}: {message}")
+
+    def _print(self, msg: str):
+        eprint(msg)
 
     def error(self, line: int, message: str):
         self.report(line, "", message)
@@ -25,10 +28,10 @@ class Reporter:
     def string(self, value):
         if value is None:
             return "nil"
-        elif value is True:
-            return "true"
-        elif value is False:
-            return "false"
+        elif isinstance(value, bool):
+            return str(value).lower()
+        elif isinstance(value, str):
+            return f'"{value}"'
         return str(value)
 
     def runtime_error(self, error):

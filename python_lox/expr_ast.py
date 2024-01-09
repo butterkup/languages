@@ -1,7 +1,7 @@
 import typing
 from .base import ExprVisitor as Visitor
 
-__all__ = 'Binary', 'Grouping', 'Literal', 'Unary', 'Ternary', 'Variable', 'Assign'
+__all__ = 'Binary', 'Grouping', 'Literal', 'Unary', 'Ternary', 'Variable', 'Assign', 'Logical'
 
 if typing.TYPE_CHECKING:
     from .token import Token
@@ -71,3 +71,13 @@ class Assign:
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):
         return visitor.visit_assign(self)
+
+
+class Logical:
+    def __init__(self: 'typing.Self', left: 'Expr', operator: 'Token', right: 'Expr') -> None:
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_logical(self)

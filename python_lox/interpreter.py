@@ -161,3 +161,23 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
                 statement.accept(self)
         finally:
             self.env = previous
+
+    def visit_if(self, stmt):
+        value = stmt.condition.accept(self)
+        if self.is_truthy(value):
+            stmt.then_.accept(self)
+        elif stmt.else_ is not None:
+            stmt.else_.accept(self)
+
+    def visit_logical(self, expr):
+        left = self.evaluate(expr.left)
+        if expr.operator.token_type == TokenType.OR:
+            if self.is_truthy(left):
+                return left
+        elif not self.is_truthy(left):
+            return left
+        return self.evaluate(expr.right)
+
+    def visit_while(self, stmt):
+        while self.is_truthy(stmt.condition.accept(self)):
+            stmt.body.accept(self)

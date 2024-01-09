@@ -1,0 +1,7 @@
+stmt_ast.py:.base,Expr,,:.token,Token,,:.base,StmtVisitor,Visitor,:.base,Stmt,,
+Expression:Expr expression
+Print:Expr expression
+Var:Token name,Expr expression
+Block:list statements
+If:Expr condition,Stmt then_,Stmt|None else_
+While:Expr condition,Stmt body
