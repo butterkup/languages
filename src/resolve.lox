@@ -1,0 +1,41 @@
+var setter;
+var getter;
+var printer;
+var name = "Faith Njeri";
+
+{
+  var name;
+  {
+    var value;
+    fun _setter(val) {
+      value = val;
+    }
+    fun _getter() {
+      return value;
+    }
+    fun _printer() {
+      print name;
+    }
+    var name = "Darius Kimani";
+    setter = _setter;
+    getter = _getter;
+    printer = _printer;
+  }
+  name = "Lydia Njeri";
+}
+print getter();
+setter("Simon Nganga");
+print getter();
+printer();
+
+print "-------------------";
+
+{
+  print name;
+  var name = name;
+  print name;
+  name = "Obed";
+  print name;
+}
+
+print name;

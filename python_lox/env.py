@@ -8,6 +8,8 @@ if ty.TYPE_CHECKING:
 else:
     Token = None
 
+_T = ty.TypeVar("_T")
+
 
 class Environment(dict[str, object]):
     def __init__(self, outer: ty.Union["Environment", None] = None):
@@ -31,3 +33,64 @@ class Environment(dict[str, object]):
 
     def undefined(self, name: Token):
         raise LoxUndefinedVariable(name, f"Undefined variable {name.lexeme!r}")
+
+    def getAt(self, distance: int, name: Token):
+        return self.ancestor(distance).get(name.lexeme)
+
+    def assignAt(self, distance: int, name: Token, value: ty.Any):
+        self.ancestor(distance)[name.lexeme] = value
+
+    def ancestor(self, distance: int):
+        env = ty.cast(Environment, self)
+        while distance:
+            env = ty.cast(Environment, env.outer)
+            distance -= 1
+        return env
+
+
+sentinel = object()
+
+
+class Bucket:
+    def __init__(self, init=sentinel) -> None:
+        self._value = init
+
+    def get(self):
+        return self._value
+
+    def set(self, value):
+        self._value = value
+
+    def empty(self):
+        return self._value is sentinel
+
+    def clear(self):
+        self._value = sentinel
+
+
+class Env:
+    def __init__(self, outer: "Env | None" = None) -> None:
+        self._outer = outer
+        self._env: dict[str, Bucket] = dict()
+
+    def declare(self, name: str, bucket: None | Bucket = None):
+        bucket = bucket or Bucket()
+        if name in self._env:
+            raise Exception(f"Env.declare: {name}")
+        self._env[name] = bucket
+        return bucket
+
+    def resolve_bucket(self, name: str) -> Bucket:
+        if name in self._env:
+            return self._env[name]
+        if self._outer is None:
+            raise Exception(f"Env.resolve_bucket: {name}")
+        return self._outer.resolve_bucket(name)
+
+    def set(self, name: str, value: ty.Any):
+        bucket = self.resolve_bucket(name)
+        bucket.set(value)
+
+    def get(self, name: str) -> ty.Any:
+        bucket = self.resolve_bucket(name)
+        return bucket.get()

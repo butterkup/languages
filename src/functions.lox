@@ -11,10 +11,10 @@ var add5 = addX(5);
 print add5(10);
 
 fun hello(name) {
-    print "Hello " + name + ", how was your day?";
+  print "Hello " + name + ", how was your day?";
 }
 
-// hello("Lydia");
+hello("Lydia");
 
 fun greet(func, name, count) {
   while (count > 0) {
@@ -33,51 +33,50 @@ fun factorial(n) {
 
 fun count(n) {
   if (n > 1) count(n - 1);
-  print "Current: n=" + string(n);
+  print "Current: n = " + string(n);
 }
 
-// count(5);
-// 
-// print count;
-// print hello;
-// print greet;
+count(5);
 
-// fun add(a, b) {
-//     return a + b;
-// }
+print count;
+print hello;
+print greet;
 
-// hello("Simon Nganga");
-// hello("Faith Njeri");
-// hello("Darius Kipesa");
-// hello("Harrison Kariuki");
-// hello("Obed Mireri");
+fun add(a, b) {
+  return a + b;
+}
 
-// greet(hello, "Simon Nganga", 1);
-// greet(hello, "Faith Njeri", 2);
-// greet(hello, "Darius Kipesa", 3);
-// greet(hello, "Harrison Kariuki", 2);
-// greet(hello, "Obed Mireri", 1);
+hello("Simon Nganga");
+hello("Faith Njeri");
+hello("Darius Kimani");
+hello("Harrison Kariuki");
+hello("Obed Mireri");
+
+greet(hello, "Simon Nganga", 1);
+greet(hello, "Faith Njeri", 2);
+greet(hello, "Darius Kipesa", 3);
+greet(hello, "Harrison Kariuki", 2);
+greet(hello, "Obed Mireri", 1);
 
 
-// 
-// fun closure_add(a) {
-//     fun add_to(b) {
-//         return a + b;
-//     }
-//     return add_to;
-// }
-// 
-// var name = "Simon Nganga";
-// hello(name);
-// 
-// var a = 10;
-// var b = 20;
-// var add_to = closure_add(a);
-// 
-// if (add(a, b) != a + b) {
-//     print "add error";
-// }
-// 
-// if (add_to(b) != a + b) {
-//     print "closure_add error";
-// }
+fun closure_add(a) {
+  fun add_to(b) {
+    return a + b;
+  }
+  return add_to;
+}
+
+var name = "Simon Nganga";
+hello(name);
+
+var a = 10;
+var b = 20;
+var add_to = closure_add(a);
+
+if (add(a, b) != a + b) {
+  print "add error";
+}
+
+if (add_to(b) != a + b) {
+  print "closure_add error";
+}

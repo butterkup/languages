@@ -1,4 +1,4 @@
-from .base import StmtVisitor, ExprVisitor, Callable
+from .base import StmtVisitor, ExprVisitor, Callable, Expr
 from .token import TokenType, Token
 from .calls import LoxFunction
 from .env import Environment
@@ -12,10 +12,22 @@ else:
 
 
 class ASTInterpreter(StmtVisitor, ExprVisitor):
-    def __init__(self, reporter: Reporter, globals: Environment | None = None) -> None:
+    def __init__(
+        self,
+        reporter: Reporter,
+        resolution: dict[Expr, int],
+        globals: Environment | None = None,
+    ) -> None:
         self.reporter = reporter
         self.globals = Environment() if globals is None else globals
         self.env = self.globals
+        self.resolution = resolution or {}
+
+    def lookup_variable(self, name: Token, expr: Expr):
+        distance = self.resolution.get(expr, None)
+        if distance is None:
+            return self.globals.getdef(name)
+        return self.env.getAt(distance, name)
 
     def visit_binary(self, expr):
         right = self.evaluate(expr.right)
@@ -144,7 +156,10 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
         print(toprint)
 
     def visit_variable(self, expr):
-        return self.env.getdef(expr.value)
+        distance = self.resolution.get(expr, None)
+        if distance is None:
+            return self.globals.getdef(expr.value)
+        return self.env.getAt(distance, expr.value)
 
     def visit_var(self, stmt):
         value = self.evaluate(stmt.expression)
@@ -152,7 +167,10 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
 
     def visit_assign(self, expr):
         value = self.evaluate(expr.expression)
-        self.env.define(expr.name, value)
+        distance = self.resolution.get(expr, None)
+        if distance is None:
+            return self.globals.define(expr.name, value)
+        self.env.assignAt(distance, expr.name, value)
         return value
 
     def visit_block(self, stmt):

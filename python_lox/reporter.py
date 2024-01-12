@@ -1,5 +1,4 @@
 from sys import stderr as _stderr
-from .token import TokenType
 
 __all__ = ("Reporter",)
 
@@ -7,9 +6,10 @@ eprint = lambda *a, **k: print(*a, **k, file=_stderr)
 
 
 class Reporter:
-    def __init__(self) -> None:
+    def __init__(self, quoted=False) -> None:
         self.had_error: bool = False
         self.had_runtime_error = False
+        self.quoted = quoted
 
     def report(self, line: int, where: str, message: str):
         self.had_error = True
@@ -30,6 +30,8 @@ class Reporter:
             return "nil"
         elif isinstance(value, bool):
             return str(value).lower()
+        elif isinstance(value, str) and self.quoted:
+            return f'"{value}"'
         return str(value)
 
     def runtime_error(self, error):

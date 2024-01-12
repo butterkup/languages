@@ -18,6 +18,7 @@ def parens(func):
 class ExprPrinter(ExprVisitor):
     def __init__(self, reporter: Reporter, env: Environment) -> None:
         self.env = env
+        reporter.quoted = True
         self.reporter = reporter
         self.depth = 0
 
@@ -62,8 +63,8 @@ class ExprPrinter(ExprVisitor):
 
     def visit_call(self, expr):
         callee = expr.callee.accept(self)
-        args = ", ".join([arg.accept(self) for arg in expr.arguments])
-        return f"{callee}({args})"
+        args = [arg.accept(self) for arg in expr.arguments]
+        return f"{callee}({', '.join(args)})"
 
 
 class StmtPrinter(ExprPrinter, StmtVisitor):

@@ -78,9 +78,10 @@ class Parser:
             parameters.append(self.previous())
             self.match(TokenType.COMMA)
         self.consume(TokenType.RIGHT_PAREN, "Expected ')' after function parameters.")
-        self.consume(
-            TokenType.LEFT_BRACE, "Expected '{' after function parameters."
-        )
+        self.consume(TokenType.LEFT_BRACE, "Expected '{' after function parameters.")
+        assert len(set(ps := [p.lexeme for p in parameters])) == len(
+            parameters
+        ), f"Duplicate parameter names found in {ps} in function definition of {fname.lexeme}"
         return Function(fname, parameters, self.block_stmt())
 
     def block_stmt(self):

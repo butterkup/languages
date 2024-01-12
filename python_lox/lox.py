@@ -1,10 +1,11 @@
 # from .debug import StmtPrinter as ASTInterpreter
 from .interpreter import ASTInterpreter
 from .reporter import Reporter, eprint
+from .globals import getglobals
+from .resolver import Resolver
 from .env import Environment
 from .parser import Parser
 from .lexer import Lexer
-from .globals import getglobals
 from pathlib import Path
 
 
@@ -38,8 +39,15 @@ class Lox:
             eprint("Errors occurred in the parsing stage, aborting!")
             return
 
+        resolver = Resolver(self.reporter)
+        resolution = resolver.resolve(*program)
+
+        if self.reporter.had_error:
+            eprint("Errors occurred in the resolution stage, aborting!")
+            return
+
         # Executor -> TreeWalkInterpreter
-        evaluator = ASTInterpreter(self.reporter, self.env)
+        evaluator = ASTInterpreter(self.reporter, resolution, self.env)
         evaluator.interpret(program)
 
         if self.reporter.had_runtime_error:
