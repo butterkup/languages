@@ -34,17 +34,24 @@ class Environment(dict[str, object]):
     def undefined(self, name: Token):
         raise LoxUndefinedVariable(name, f"Undefined variable {name.lexeme!r}")
 
-    def getAt(self, distance: int, name: Token):
-        return self.ancestor(distance).get(name.lexeme)
+    def getAt(self, distance: int, name: Token, other):
+        env = self.ancestor(distance)
+        if name.lexeme in env:
+            return env[name.lexeme]
+        if other is not None and name.lexeme in other:
+            return other[name.lexeme]
+        self.undefined(name)
 
     def assignAt(self, distance: int, name: Token, value: ty.Any):
-        self.ancestor(distance)[name.lexeme] = value
+        env = self.ancestor(distance)
+        if name.lexeme not in env:
+            self.undefined(name)
+        env[name.lexeme] = value
 
-    def ancestor(self, distance: int):
-        env = ty.cast(Environment, self)
-        while distance:
-            env = ty.cast(Environment, env.outer)
-            distance -= 1
+    def ancestor(self, distance: int) -> "Environment":
+        env = self
+        while distance > 0 and env.outer is not None:
+            env, distance = env.outer, distance - 1
         return env
 
 

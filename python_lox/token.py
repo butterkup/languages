@@ -42,6 +42,7 @@ class TokenType(enum.IntFlag):
     OR = enum.auto()
     PRINT = enum.auto()
     RETURN = enum.auto()
+    BREAK = enum.auto()
     SUPER = enum.auto()
     THIS = enum.auto()
     TRUE = enum.auto()

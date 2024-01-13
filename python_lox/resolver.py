@@ -52,6 +52,7 @@ class Context:
 
 CLASS = "CLASS"
 FUNCTION = "FUNCTION"
+LOOP = "LOOP"
 
 
 class Scopes:
@@ -102,7 +103,7 @@ class Resolver(ExprVisitor, StmtVisitor):
         self.reporter = reporter
         self.scopes = Scopes(reporter)
         self.define = self.scopes.define
-        self.locals: dict[Expr, int] = {}
+        self.locals: dict[Expr, int | None] = {}
         self.declare = self.scopes.declare
 
     @property
@@ -115,8 +116,7 @@ class Resolver(ExprVisitor, StmtVisitor):
 
     def resolve_local(self, expr: Expr, name: Token):
         distance = self.scopes.resolve(name)
-        if distance is not None:
-            self.locals[expr] = distance
+        self.locals[expr] = distance
 
     def resolve_function(self, func: sast.Function):
         with self.scopes, self.ctx.within(FUNCTION):
@@ -166,7 +166,8 @@ class Resolver(ExprVisitor, StmtVisitor):
         self._resolve(stmt.value)
 
     def visit_while(self, stmt: sast.While):
-        self._resolve(stmt.condition, stmt.body)
+        with self.ctx.within(LOOP):
+            self._resolve(stmt.condition, stmt.body)
 
     def visit_binary(self, expr: ty.Union[east.Binary, east.Logical]):
         self._resolve(expr.right, expr.left)
@@ -191,3 +192,10 @@ class Resolver(ExprVisitor, StmtVisitor):
     def resolve(self, *root: Expr | Stmt):
         self._resolve(*root)
         return self.locals
+    
+    def visit_break(self, stmt):
+        if LOOP not in self.ctx:
+            self.reporter.error(
+                stmt.keyword.line,
+                "'break' statement must be used within the while loop."
+            )

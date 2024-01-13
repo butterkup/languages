@@ -55,6 +55,9 @@ class StmtVisitor(typing.Protocol):
     def visit_return(self, stmt):
         ...
 
+    def visit_break(self, stmt):
+        ...
+
 
 class Expr(typing.Protocol):
     def accept(self, visitor: "ExprVisitor"):

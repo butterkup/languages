@@ -18,6 +18,7 @@ keywords: ty.Final = {
     "true": TokenType.TRUE,
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
+    "break": TokenType.BREAK,
 }
 
 comparison_operators: ty.Final = {

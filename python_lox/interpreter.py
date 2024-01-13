@@ -15,7 +15,7 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
     def __init__(
         self,
         reporter: Reporter,
-        resolution: dict[Expr, int],
+        resolution: dict[Expr, int | None],
         globals: Environment | None = None,
     ) -> None:
         self.reporter = reporter
@@ -24,10 +24,13 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
         self.resolution = resolution or {}
 
     def lookup_variable(self, name: Token, expr: Expr):
-        distance = self.resolution.get(expr, None)
+        distance = self.resolution.get(expr)
         if distance is None:
             return self.globals.getdef(name)
-        return self.env.getAt(distance, name)
+        return self.env.getAt(distance, name, self.globals)
+
+    def visit_break(self, stmt):
+        raise ExitIteration
 
     def visit_binary(self, expr):
         right = self.evaluate(expr.right)
@@ -156,10 +159,7 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
         print(toprint)
 
     def visit_variable(self, expr):
-        distance = self.resolution.get(expr, None)
-        if distance is None:
-            return self.globals.getdef(expr.value)
-        return self.env.getAt(distance, expr.value)
+        return self.lookup_variable(expr.value, expr)
 
     def visit_var(self, stmt):
         value = self.evaluate(stmt.expression)
@@ -200,7 +200,10 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
 
     def visit_while(self, stmt):
         while self.is_truthy(stmt.condition.accept(self)):
-            stmt.body.accept(self)
+            try:
+                stmt.body.accept(self)
+            except ExitIteration:
+                break
 
     def visit_call(self, expr):
         callee = self.evaluate(expr.callee)

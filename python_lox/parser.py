@@ -9,8 +9,18 @@ from .expr_ast import (
     Logical,
     Call,
 )
+from .stmt_ast import (
+    Expression,
+    Print,
+    Var,
+    Block,
+    If,
+    While,
+    Function,
+    Return,
+    Break,
+)
 from .category import BINARY_OPERATORS, COMPARISON_OPERATORS, EQUALITY_OPERATORS
-from .stmt_ast import Expression, Print, Var, Block, If, While, Function, Return
 from .exc import ParserError, MissingExpr
 from .token import Token, TokenType
 from .reporter import Reporter
@@ -58,6 +68,10 @@ class Parser:
             return self.for_stmt()
         if self.match(TokenType.RETURN):
             return self.return_stmt()
+        if self.match(TokenType.BREAK):
+            stmt = Break(self.previous())
+            self.consume(TokenType.SEMICOLON, "expected ';' after break keyword.")
+            return stmt
         return self.expr_stmt()
 
     def return_stmt(self):
@@ -101,7 +115,9 @@ class Parser:
         condition = self.expression()
         self.consume(TokenType.RIGHT_PAREN, "Expected ')' after if expression.")
         then_ = self.statement()
-        else_ = self.statement() if self.match(TokenType.ELSE) else None
+        else_ = None
+        if self.match(TokenType.ELSE):
+            else_ = self.statement()
         return If(condition, then_, else_)
 
     def expr_stmt(self):
@@ -237,7 +253,7 @@ class Parser:
 
     def call(self):
         callee = self.primary()
-        if self.match(TokenType.LEFT_PAREN):
+        while self.match(TokenType.LEFT_PAREN):
             open_paren = self.previous()
             arguments = []
             if not self.check(TokenType.RIGHT_PAREN):
@@ -245,7 +261,7 @@ class Parser:
                 while self.match(TokenType.COMMA):
                     arguments.append(self.expression())
             self.consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments.")
-            return Call(callee, open_paren, arguments, self.previous())
+            callee = Call(callee, open_paren, arguments, self.previous())
         return callee
 
     def primary(self):

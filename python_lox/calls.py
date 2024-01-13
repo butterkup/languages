@@ -32,5 +32,7 @@ class LoxFunction(Callable):
         args = ", ".join([p.lexeme for p in self.function.params])
         return f"<fn {name}({args})>"
 
+    __repr__ = __str__
+
     def accept(self, visitor):
         return self.function.accept(visitor)

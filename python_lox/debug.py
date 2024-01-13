@@ -16,11 +16,12 @@ def parens(func):
 
 
 class ExprPrinter(ExprVisitor):
-    def __init__(self, reporter: Reporter, env: Environment) -> None:
-        self.env = env
-        reporter.quoted = True
+    def __init__(self, reporter: Reporter, resolution, env: Environment) -> None:
+        self.resolution = resolution
         self.reporter = reporter
+        reporter.quoted = True
         self.depth = 0
+        self.env = env
 
     @property
     def dent(self) -> str:
@@ -106,3 +107,9 @@ class StmtPrinter(ExprPrinter, StmtVisitor):
 
     def visit_return(self, stmt):
         return f"return {stmt.value.accept(self)};"
+
+    def visit_break(self, stmt):
+        return "break;"
+
+    def visit_continue(self, stmt):
+        return "continue;"

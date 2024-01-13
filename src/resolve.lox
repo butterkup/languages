@@ -39,3 +39,17 @@ print "-------------------";
 }
 
 print name;
+
+print "-------------------";
+
+fun addx(x) {
+  fun addy(y) {
+    fun addz(z) {
+      return x + y + z;
+    }
+    return addz;
+  }
+  return addy;
+}
+
+print addx(5)(10)(20);

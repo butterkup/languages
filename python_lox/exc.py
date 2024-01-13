@@ -25,6 +25,14 @@ class ReturnValue(BaseLoxError):
         self.return_value = value
 
 
+class NextIteration(BaseLoxError):
+    ...
+
+
+class ExitIteration(BaseLoxError):
+    ...
+
+
 class LoxTypeError(LoxRuntimeError):
     ...
 
