@@ -1,23 +1,48 @@
 // Lox classes and OOP constructs
-
 class Person {
-    init (name, age) {
-        this.name = name;
-        this.age = age;
-    }
-    who() {
-        print "I am " + this.name;
-    }
+  init (name, age) {
+    // this.name = name;
+    // this.age = age;
+  }
+  who(_this) {
+    print "I am " + _this.name + ".";
+  }
 }
 
+fun greet(_this) {
+  fun greeter(other) {
+    print "Hello " + string(other.name) + "? My name is " + string(_this.name) + "!";
+  }
+  return greeter;
+}
+
+Person.greet = greet;
+
+var me = Person();
+var sis = Person();
+sis.name = "Faith Njeri";
+me.name = "Simon Nganga";
+me.age = me.number = 21;
+me.greet(me)(sis);
+sis.greet(sis)(me);
+print me;
+print "My name is " + me.name + " and I am " + string(me.age) + " years old.";
+
+me.who(me);
+
+/*
+
+print Person;
+print Person().name.length.bit_count(1) - 90;
+
 class PersonEmail < Person {
-    init(name, age, email) {
-        super.init(name, age);
-        this.email = email;
-    }
-    contact() {
-        print "You can find me via " + this.email;
-    }
+  init(name, age, email) {
+    super.init(name, age);
+    this.email = email;
+  }
+  contact() {
+     print "You can find me via " + this.email;
+  }
 }
 
 var me = Person("Simon Nganga", 21);
@@ -25,3 +50,13 @@ me.who();
 var him = PersonEmail("Mark John", 34, "markjohn@gmail.com");
 him.who();
 him.contact();
+
+*/
+
+/*
+
+This is a fucking multiline
+comment. Booooyaaaaa!
+Mic DROP (^_^)
+
+*/

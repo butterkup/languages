@@ -27,6 +27,20 @@ class ExprPrinter(ExprVisitor):
     def dent(self) -> str:
         return "  " * self.depth
 
+    def visit_this(self, expr):
+        return 'this'
+
+    @parens
+    def visit_set(self, expr):
+        value = expr.value.accept(self)
+        inst = expr.instance.accept(self)
+        prop = expr.name.lexeme
+        return f"{inst}.{prop} = {value}"
+
+    @parens
+    def visit_get(self, expr):
+        return f"{expr.instance.accept(self)}.{expr.name.lexeme}"
+
     @parens
     def visit_binary(self, expr):
         right = expr.right.accept(self)
@@ -69,6 +83,15 @@ class ExprPrinter(ExprVisitor):
 
 
 class StmtPrinter(ExprPrinter, StmtVisitor):
+    def visit_class(self, stmt):
+        self.depth += 1
+        methods = [
+            self.dent + fun.accept(self).lstrip("fun ") for fun in stmt.functions
+        ]
+        self.depth -= 1
+        body = [f"class {stmt.name.lexeme} " + "{", *methods, self.dent + "}"]
+        return "\n".join(body)
+
     def visit_block(self, stmt):
         self.depth += 1
         lines = [self.dent + line.accept(self) for line in stmt.statements]

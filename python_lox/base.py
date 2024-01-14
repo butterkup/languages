@@ -29,6 +29,15 @@ class ExprVisitor(typing.Protocol):
     def visit_call(self, expr):
         ...
 
+    def visit_get(self, expr):
+        ...
+
+    def visit_set(self, expr):
+        ...
+    
+    def visit_this(self, expr):
+        ...
+
 
 class StmtVisitor(typing.Protocol):
     def visit_print(self, stmt):
@@ -56,6 +65,9 @@ class StmtVisitor(typing.Protocol):
         ...
 
     def visit_break(self, stmt):
+        ...
+
+    def visit_class(self, stmt):
         ...
 
 

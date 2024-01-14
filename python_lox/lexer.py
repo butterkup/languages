@@ -66,6 +66,19 @@ class Lexer:
                         if self.empty():
                             break
                         self.advance()
+                elif self.match('*'):
+                    start = self._line
+                    while True:
+                        if self.empty():
+                            self.repoter.error(start, "Multiline comment was never closed.")
+                            break
+                        if self.peek() == '\n':
+                            self._line += 1
+                        if self.peek() == '*' and self.peek_next() == '/':
+                            self.advance()
+                            self.advance()
+                            break
+                        self.advance()
                 else:
                     self.add_token(TokenType.SLASH)
             case '\r' | '\t' | ' ' | '\v' | '\f': pass

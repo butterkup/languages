@@ -125,6 +125,24 @@ class Resolver(ExprVisitor, StmtVisitor):
                 self.define(param)
             self._resolve(*func.body.statements)
 
+    def visit_this(self, expr: east.This):
+        if CLASS in self.ctx and FUNCTION in self.ctx:
+            return self.resolve_local(expr, expr.keyword)
+        self.reporter.error(expr.keyword.line, "'this' must be used inside a method.")
+
+    def visit_get(self, expr):
+        self._resolve(expr.instance)
+
+    def visit_set(self, expr):
+        self._resolve(expr.instance, expr.value)
+
+    def visit_class(self, stmt: sast.Class):
+        self.declare(stmt.name)
+        self.define(stmt.name)
+        with self.scopes as scope, self.ctx.within(CLASS):
+            scope["this"] = True
+            self._resolve(*stmt.functions)
+
     def visit_block(self, stmt: sast.Block):
         with self.scopes:
             self._resolve(*stmt.statements)
@@ -192,10 +210,10 @@ class Resolver(ExprVisitor, StmtVisitor):
     def resolve(self, *root: Expr | Stmt):
         self._resolve(*root)
         return self.locals
-    
+
     def visit_break(self, stmt):
         if LOOP not in self.ctx:
             self.reporter.error(
                 stmt.keyword.line,
-                "'break' statement must be used within the while loop."
+                "'break' statement must be used within the while loop.",
             )

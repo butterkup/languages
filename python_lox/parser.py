@@ -8,6 +8,8 @@ from .expr_ast import (
     Assign,
     Logical,
     Call,
+    Get,
+    Set,
 )
 from .stmt_ast import (
     Expression,
@@ -19,11 +21,13 @@ from .stmt_ast import (
     Function,
     Return,
     Break,
+    Class,
 )
 from .category import BINARY_OPERATORS, COMPARISON_OPERATORS, EQUALITY_OPERATORS
 from .exc import ParserError, MissingExpr
 from .token import Token, TokenType
 from .reporter import Reporter
+from .expr_ast import This
 
 
 class Parser:
@@ -48,6 +52,8 @@ class Parser:
                 return self.var_stmt()
             if self.match(TokenType.FUN):
                 return self.fun_stmt()
+            if self.match(TokenType.CLASS):
+                return self.class_stmt()
             return self.statement()
         except ParserError:
             self.synchronize()
@@ -82,10 +88,23 @@ class Parser:
         )
         return Return(keyword, value)
 
+    def class_stmt(self):
+        class_name = self.consume(
+            TokenType.IDENTIFIER, "Expected class name after 'class' keyword"
+        )
+        self.consume(TokenType.LEFT_BRACE, "Expected class body '{}' after class name.")
+        functions = []
+        while not self.empty() and not self.check(TokenType.RIGHT_BRACE):
+            function = self.fun_stmt()
+            functions.append(function)
+        self.consume(
+            TokenType.RIGHT_BRACE,
+            f"Expected {'}'!r} to end class body for class {class_name.lexeme!r}",
+        )
+        return Class(class_name, functions)
+
     def fun_stmt(self):
-        if not self.check(TokenType.IDENTIFIER):
-            raise ParserError(self.peek(), "Expected an identifier after fun keyword.")
-        fname = self.advance()
+        fname = self.consume(TokenType.IDENTIFIER, "Expected a function identifier.")
         self.consume(TokenType.LEFT_PAREN, "Expected '(' after function identifier.")
         parameters = []
         while self.match(TokenType.IDENTIFIER):
@@ -93,9 +112,12 @@ class Parser:
             self.match(TokenType.COMMA)
         self.consume(TokenType.RIGHT_PAREN, "Expected ')' after function parameters.")
         self.consume(TokenType.LEFT_BRACE, "Expected '{' after function parameters.")
-        assert len(set(ps := [p.lexeme for p in parameters])) == len(
-            parameters
-        ), f"Duplicate parameter names found in {ps} in function definition of {fname.lexeme}"
+        if not len(set(ps := [p.lexeme for p in parameters])) == len(parameters):
+            self.reporter.error(
+                fname.line,
+                f"Duplicate parameter names found in {ps} "
+                f"in function definition of {fname.lexeme}",
+            )
         return Function(fname, parameters, self.block_stmt())
 
     def block_stmt(self):
@@ -177,9 +199,12 @@ class Parser:
         expr = self.logic_or()
         if self.match(TokenType.EQUAL):
             equals = self.previous()
-            if isinstance(expr, Variable):
-                value = self.assignment()
-                return Assign(expr.value, value)
+            value = self.assignment()
+            match expr:
+                case Variable():
+                    return Assign(expr.value, value)
+                case Get():
+                    return Set(expr.instance, expr.name, value)
             self.error(equals, "Expected an assignable target.")
         return expr
 
@@ -253,15 +278,27 @@ class Parser:
 
     def call(self):
         callee = self.primary()
-        while self.match(TokenType.LEFT_PAREN):
-            open_paren = self.previous()
-            arguments = []
-            if not self.check(TokenType.RIGHT_PAREN):
-                arguments.append(self.expression())
-                while self.match(TokenType.COMMA):
-                    arguments.append(self.expression())
-            self.consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments.")
-            callee = Call(callee, open_paren, arguments, self.previous())
+        while True:
+            match self.peek().token_type:
+                case TokenType.DOT:
+                    self.advance()
+                    name = self.consume(
+                        TokenType.IDENTIFIER, "Expected an attribute name after '.'"
+                    )
+                    callee = Get(callee, name)
+                case TokenType.LEFT_PAREN:
+                    open_paren = self.advance()
+                    arguments = []
+                    if not self.check(TokenType.RIGHT_PAREN):
+                        arguments.append(self.expression())
+                        while self.match(TokenType.COMMA):
+                            arguments.append(self.expression())
+                    close = self.consume(
+                        TokenType.RIGHT_PAREN, "Expected ')' after arguments."
+                    )
+                    callee = Call(callee, open_paren, arguments, close)
+                case _:
+                    break
         return callee
 
     def primary(self):
@@ -275,6 +312,8 @@ class Parser:
             expr = self.expression()
             self.consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.")
             return Grouping(expr)
+        if self.match(TokenType.THIS):
+            return This(self.previous())
         if self.match(TokenType.IDENTIFIER):
             return Variable(self.previous())
         raise self.error(

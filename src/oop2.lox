@@ -1,0 +1,57 @@
+class Person {
+  init(name, age) {
+    this.name = name;
+    this.age = age;
+    return 8;
+  }
+  who() {
+    print "My name is " + string(this.name) +
+      " and I am " + string(this.age) + " years old. sqr(age) = " + 
+      string(this.sqr(this.age));
+  }
+  me() {
+    fun getthis() {
+      return this;
+    }
+    return getthis;
+  }
+}
+
+
+class Greeter {
+  greet(other) {
+    print "Hello " + other.name + "? I'm " + this.name + "!";
+  }
+}
+
+fun sqr(n) { return n * n; }
+Person.sqr = sqr;
+
+class Hello {
+  init(something) {
+    print "Init HELLO";
+  }
+}
+
+var me = Person("Simon Nganga", 21);
+var sis = Person("Faith Njeri", 11);
+
+Person.greet = Greeter.greet;
+
+me.greet(sis);
+sis.greet(me);
+
+
+// Person.init = Hello.init;
+var me = Person("Simon", 20);
+me.who();
+var getter = me.me();
+var me2 = getter();
+me2.who();
+print me.sqr(67);
+
+fun times2(n) { return n + n; }
+Person.sqr = times2;
+
+print me.sqr(67);
+print Person.sqr(67);

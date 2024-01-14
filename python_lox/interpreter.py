@@ -1,6 +1,6 @@
 from .base import StmtVisitor, ExprVisitor, Callable, Expr
 from .token import TokenType, Token
-from .calls import LoxFunction
+from .calls import LoxFunction, LoxClass, LoxInstance, LoxMethod
 from .env import Environment
 from .exc import *
 import typing
@@ -28,6 +28,37 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
         if distance is None:
             return self.globals.getdef(name)
         return self.env.getAt(distance, name, self.globals)
+
+    def visit_this(self, expr):
+        return self.lookup_variable(expr.keyword, expr)
+
+    def visit_get(self, expr):
+        instance = expr.instance.accept(self)
+        if not isinstance(instance, (LoxInstance, LoxClass)):
+            raise LoxTypeError(
+                expr.name,
+                f"expected an instance/class on the right but got {type(expr.instance)}",
+            )
+        return instance.get(expr.name)
+
+    def visit_set(self, expr):
+        instance = expr.instance.accept(self)
+        if not isinstance(instance, (LoxInstance, LoxClass)):
+            raise LoxTypeError(
+                expr.name,
+                f"expected an instance/class on the right but got {type(expr.instance)}",
+            )
+        value = expr.value.accept(self)
+        instance.set(expr.name, value)
+        return value
+
+    def visit_class(self, stmt):
+        methods = {
+            func.name.lexeme: LoxMethod(func, self.env) for func in stmt.functions
+        }
+        klass = LoxClass(stmt.name.lexeme, {})
+        self.env.define(stmt.name, klass, True)
+        klass.fields = methods
 
     def visit_break(self, stmt):
         raise ExitIteration

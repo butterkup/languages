@@ -1,7 +1,7 @@
 import typing
 
 
-__all__ = 'Expression', 'Print', 'Var', 'Block', 'If', 'While', 'Function', 'Return', 'Break'
+__all__ = 'Expression', 'Print', 'Var', 'Block', 'If', 'While', 'Function', 'Return', 'Break', 'Class'
 
 if typing.TYPE_CHECKING:
     from .base import Expr
@@ -92,3 +92,12 @@ class Break:
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):
         return visitor.visit_break(self)
+
+
+class Class:
+    def __init__(self: 'typing.Self', name: 'Token', functions: 'list[Function]') -> None:
+        self.name = name
+        self.functions = functions
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_class(self)
