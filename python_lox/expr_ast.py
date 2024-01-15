@@ -1,7 +1,7 @@
 import typing
 from .base import ExprVisitor as Visitor
 
-__all__ = 'Binary', 'Grouping', 'Literal', 'Unary', 'Ternary', 'Variable', 'Assign', 'Logical', 'Call', 'Set', 'Get', 'This'
+__all__ = 'Binary', 'Grouping', 'Literal', 'Unary', 'Ternary', 'Variable', 'Assign', 'Logical', 'Call', 'Set', 'Get', 'This', 'Super'
 
 if typing.TYPE_CHECKING:
     from .token import Token
@@ -119,3 +119,11 @@ class This:
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):
         return visitor.visit_this(self)
+
+
+class Super:
+    def __init__(self: 'typing.Self', keyword: 'Token') -> None:
+        self.keyword = keyword
+
+    def accept(self: 'typing.Self', visitor: 'Visitor'):
+        return visitor.visit_super(self)

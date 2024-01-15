@@ -8,11 +8,13 @@ if typing.TYPE_CHECKING:
     from .token import Token
     from .base import StmtVisitor as Visitor
     from .base import Stmt
+    from .expr_ast import Variable
 else:
     Expr = None
     Token = None
     Visitor = None
     Stmt = None
+    Variable = None
 
 
 class Expression:
@@ -95,8 +97,9 @@ class Break:
 
 
 class Class:
-    def __init__(self: 'typing.Self', name: 'Token', functions: 'list[Function]') -> None:
+    def __init__(self: 'typing.Self', name: 'Token', base: 'Variable|None', functions: 'list[Function]') -> None:
         self.name = name
+        self.base = base
         self.functions = functions
 
     def accept(self: 'typing.Self', visitor: 'Visitor'):

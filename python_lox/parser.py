@@ -10,6 +10,7 @@ from .expr_ast import (
     Call,
     Get,
     Set,
+    Super
 )
 from .stmt_ast import (
     Expression,
@@ -92,7 +93,20 @@ class Parser:
         class_name = self.consume(
             TokenType.IDENTIFIER, "Expected class name after 'class' keyword"
         )
-        self.consume(TokenType.LEFT_BRACE, "Expected class body '{}' after class name.")
+        superclass = (
+            Variable(
+                self.consume(
+                    TokenType.IDENTIFIER, "Expected a base class name after '<' token."
+                )
+            )
+            if self.match(TokenType.LESS)
+            else None
+        )
+        self.consume(
+            TokenType.LEFT_BRACE,
+            "Expected class body '{}' after class name "
+            f"{class_name.lexeme!r}, got {self.peek().lexeme}",
+        )
         functions = []
         while not self.empty() and not self.check(TokenType.RIGHT_BRACE):
             function = self.fun_stmt()
@@ -101,7 +115,7 @@ class Parser:
             TokenType.RIGHT_BRACE,
             f"Expected {'}'!r} to end class body for class {class_name.lexeme!r}",
         )
-        return Class(class_name, functions)
+        return Class(class_name, superclass, functions)
 
     def fun_stmt(self):
         fname = self.consume(TokenType.IDENTIFIER, "Expected a function identifier.")
@@ -314,6 +328,8 @@ class Parser:
             return Grouping(expr)
         if self.match(TokenType.THIS):
             return This(self.previous())
+        if self.match(TokenType.SUPER):
+            return Super(self.previous())
         if self.match(TokenType.IDENTIFIER):
             return Variable(self.previous())
         raise self.error(

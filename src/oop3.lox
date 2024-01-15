@@ -1,0 +1,72 @@
+class Name {
+  greet() {
+    print "Hello " + this.name + "?";
+  }
+}
+
+Name.name = "<default name>";
+
+var named = Name();
+named.name = "Faith Njeri";
+named.greet();
+named = Name();
+named.greet();
+
+class Cook {
+  init(food) {
+    this.food = food;
+  }
+  cook() {
+    print "I'm cooking " + this.food;
+  }
+}
+
+class Pizza < Cook {
+  init() {
+    super.init("Pizza");
+  }
+}
+
+class Bacon < Pizza {
+  cook() {
+    super.cook();
+    print "With bacon toppings.";
+  }
+}
+
+fun __cooked() {
+  print "Ready to eat!";
+}
+
+Cook.cooked = __cooked;
+
+var c = Cook("Pilau");
+c.cook();
+
+var p = Pizza();
+p.cook();
+
+var f = Bacon();
+f.cook();
+f.cooked();
+
+class Base {
+  base() {
+    print "Base Method.";
+  }
+}
+
+class Sub < Base {
+  sub() {
+    print "Sub Method.";
+  }
+}
+
+
+var s = Sub();
+var b = Base();
+
+s.sub();
+s.base();
+
+b.base();

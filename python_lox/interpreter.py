@@ -1,14 +1,10 @@
+from .exc import LoxRuntimeError, LoxTypeError, ExitIteration, LoxZeroDivisionError, ReturnValue
+from .calls import LoxFunction, LoxClass, LoxInstance, LoxMethod, BoundSuper
 from .base import StmtVisitor, ExprVisitor, Callable, Expr
 from .token import TokenType, Token
-from .calls import LoxFunction, LoxClass, LoxInstance, LoxMethod
+from .reporter import Reporter
 from .env import Environment
-from .exc import *
 import typing
-
-if typing.TYPE_CHECKING:
-    from .reporter import Reporter
-else:
-    Reporter = None
 
 
 class ASTInterpreter(StmtVisitor, ExprVisitor):
@@ -32,9 +28,17 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
     def visit_this(self, expr):
         return self.lookup_variable(expr.keyword, expr)
 
+    def visit_super(self, expr):
+        distance = self.resolution.get(expr) or -1
+        instance = self.env.getAt(
+            distance - 1, Token(TokenType.THIS, "this", None, -1), None
+        )
+        klass = self.lookup_variable(expr.keyword, expr)
+        return BoundSuper(klass, instance)
+
     def visit_get(self, expr):
         instance = expr.instance.accept(self)
-        if not isinstance(instance, (LoxInstance, LoxClass)):
+        if not isinstance(instance, (LoxInstance, LoxClass, BoundSuper)):
             raise LoxTypeError(
                 expr.name,
                 f"expected an instance/class on the right but got {type(expr.instance)}",
@@ -43,7 +47,7 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
 
     def visit_set(self, expr):
         instance = expr.instance.accept(self)
-        if not isinstance(instance, (LoxInstance, LoxClass)):
+        if not isinstance(instance, (LoxInstance, LoxClass, BoundSuper)):
             raise LoxTypeError(
                 expr.name,
                 f"expected an instance/class on the right but got {type(expr.instance)}",
@@ -53,10 +57,18 @@ class ASTInterpreter(StmtVisitor, ExprVisitor):
         return value
 
     def visit_class(self, stmt):
-        methods = {
-            func.name.lexeme: LoxMethod(func, self.env) for func in stmt.functions
-        }
-        klass = LoxClass(stmt.name.lexeme, {})
+        base = stmt.base.accept(self) if stmt.base is not None else None
+        if stmt.base is not None and not isinstance(base, LoxClass):
+            self.reporter.error(
+                stmt.base.value.line,
+                f"Superclass must be a class, got " + self.reporter.string(base),
+            )
+        env = self.env
+        if base is not None:
+            env = Environment(env)
+            env['super'] = base
+        methods = {func.name.lexeme: LoxMethod(func, env) for func in stmt.functions}
+        klass = LoxClass(stmt.name.lexeme, base=base)
         self.env.define(stmt.name, klass, True)
         klass.fields = methods
 

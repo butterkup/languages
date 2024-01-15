@@ -15,7 +15,7 @@ I have chosen the suffix `.lox` to indicate `Lox` source files.
 
 Implementations.
 
-- [ ] python_lox - `Lox` implementation in `python`.
+- [x] python_lox - `Lox` implementation in `python`.
 - [ ] c_lox - `Lox` implementation in `c`.
 
 ## Tools Used

@@ -51,6 +51,7 @@ class Context:
 
 
 CLASS = "CLASS"
+SUBCLASS = "SUBCLASS"
 FUNCTION = "FUNCTION"
 LOOP = "LOOP"
 
@@ -130,6 +131,14 @@ class Resolver(ExprVisitor, StmtVisitor):
             return self.resolve_local(expr, expr.keyword)
         self.reporter.error(expr.keyword.line, "'this' must be used inside a method.")
 
+    def visit_super(self, expr: east.Super):
+        if FUNCTION in self.ctx and SUBCLASS in self.ctx:
+            return self.resolve_local(expr, expr.keyword)
+        self.reporter.error(
+            expr.keyword.line,
+            "'super' must be used inside a method of a derived class.",
+        )
+
     def visit_get(self, expr):
         self._resolve(expr.instance)
 
@@ -139,9 +148,20 @@ class Resolver(ExprVisitor, StmtVisitor):
     def visit_class(self, stmt: sast.Class):
         self.declare(stmt.name)
         self.define(stmt.name)
-        with self.scopes as scope, self.ctx.within(CLASS):
-            scope["this"] = True
-            self._resolve(*stmt.functions)
+        subclass = self.scopes if stmt.base is not None else Scopes(self.reporter)
+        clstype = SUBCLASS if stmt.base is not None else CLASS
+        with subclass as subscope:
+            subscope['super'] = True
+            with self.scopes as scope, self.ctx.within(clstype):
+                scope["this"] = True
+                self._resolve(*stmt.functions)
+                if stmt.base is not None:
+                    if stmt.base.value.lexeme == stmt.name.lexeme:
+                        self.reporter.error(
+                            stmt.base.value.line,
+                            "Class inheriting from itself is forbiden.",
+                        )
+                    self._resolve(stmt.base)
 
     def visit_block(self, stmt: sast.Block):
         with self.scopes:

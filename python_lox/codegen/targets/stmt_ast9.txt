@@ -1,4 +1,4 @@
-stmt_ast.py:.base,Expr,,:.token,Token,,:.base,StmtVisitor,Visitor,:.base,Stmt,,
+stmt_ast.py:.base,Expr,,:.token,Token,,:.base,StmtVisitor,Visitor,:.base,Stmt,,:.expr_ast,Variable,,
 Expression:Expr expression
 Print:Expr expression
 Var:Token name,Expr expression
@@ -8,4 +8,4 @@ While:Expr condition,Stmt body
 Function:Token name,list[Token] params,Block body
 Return:Token keyword,Expr value
 Break:Token keyword
-Class:Token name,list[Function] functions
+Class:Token name,Variable|None base,list[Function] functions

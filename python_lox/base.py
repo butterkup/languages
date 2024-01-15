@@ -38,6 +38,8 @@ class ExprVisitor(typing.Protocol):
     def visit_this(self, expr):
         ...
 
+    def visit_super(self, expr):
+        ...
 
 class StmtVisitor(typing.Protocol):
     def visit_print(self, stmt):
