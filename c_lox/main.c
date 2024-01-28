@@ -1,27 +1,34 @@
 #include <lox/all.h>
 #include <stdio.h>
 
+void test_scanner() {
+  const char *src = "1 + 3 / 5 - 9";
+  scanner_init(src);
+  Token tk;
+  for (;;) {
+    tk = scan();
+    token_print(&tk);
+    if (tk.type == TOKEN_EOF)
+      break;
+  }
+}
+
+bool ola() {
+  if (3 > 2)
+    return true;
+  return false;
+}
+
 int main(int argc, char **argv) {
-  vm_init();
-  Chunk arr;
-  chunk_init(&arr);
-  // Bytecode for the expression
-  // -((2 + 3) / 10)  = -0.5
-  int constant = chunk_cappend(&arr, 2);
-  chunk_append(&arr, OP_CONSTANT, 1);
-  chunk_append(&arr, constant, 1);
-  constant = chunk_cappend(&arr, 3);
-  chunk_append(&arr, OP_CONSTANT, 1);
-  chunk_append(&arr, constant, 1);
-  chunk_append(&arr, OP_ADD, 1);
-  constant = chunk_cappend(&arr, 10);
-  chunk_append(&arr, OP_CONSTANT, 1);
-  chunk_append(&arr, constant, 1);
-  chunk_append(&arr, OP_DIVIDE, 1);
-  chunk_append(&arr, OP_NEGATE, 1);
-  chunk_append(&arr, OP_RETURN, 1);
-  disassemble_chunk(&arr, "instructions");
-  interpret(&arr);
-  vm_delete();
-  chunk_delete(&arr);
+  test_scanner();
+  // vm_init();
+  // if (argc == 1)
+  //   repl();
+  // else if (argc == 2)
+  //   run_file(argv[1]);
+  // else {
+  //   fputs("Usage: clox [path]\n", stderr);
+  //   exit(64);
+  // }
+  // vm_delete();
 }

@@ -1,8 +1,10 @@
 #ifndef _CLOX_DEBUG_H
 #define _CLOX_DEBUG_H
 
-#include <stdio.h>
+#include "common.h"
 #include "chunk.h"
+
+CLOX_BEG_DECLS
 
 int constant_instruction(const char *, Chunk *, int);
 void disassemble_chunk(Chunk *, const char *);
@@ -55,5 +57,7 @@ int constant_instruction(const char *name, Chunk *chunk, int offset) {
   printf("'\n");
   return offset + 2;
 }
+
+CLOX_END_DECLS
 
 #endif //_CLOX_DEBUG_H

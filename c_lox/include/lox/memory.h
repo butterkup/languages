@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+CLOX_BEG_DECLS
+
 #define GROW_CAPACITY(cap) \
   (cap < 8? 8 : cap * 2)
 
@@ -22,5 +24,7 @@ void *reallocate(void *ptr, size_t osize, size_t nsize) {
     exit(EXIT_FAILURE);
   return result;
 }
+
+CLOX_END_DECLS
 
 #endif //_CLOX_MEMORY_H

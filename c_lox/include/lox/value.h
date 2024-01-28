@@ -5,6 +5,8 @@
 #include "memory.h"
 #include "common.h"
 
+CLOX_BEG_DECLS
+
 typedef double Value;
 
 typedef struct {
@@ -37,5 +39,7 @@ void value_append(ValueArray *array, Value value) {
 void value_print(Value value) {
   printf("%g", value);
 }
+
+CLOX_END_DECLS
 
 #endif //_CLOX_VALUE_H

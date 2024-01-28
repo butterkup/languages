@@ -5,6 +5,8 @@
 #include "common.h"
 #include "value.h"
 
+CLOX_BEG_DECLS
+
 typedef enum {
   OP_CONSTANT,
   OP_SUBTRACT,
@@ -54,5 +56,7 @@ int chunk_cappend(Chunk *chunk, Value value) {
   value_append(&chunk->constants, value);
   return chunk->constants.count - 1;
 }
+
+CLOX_END_DECLS
 
 #endif //_CLOX_CHUNK_H
