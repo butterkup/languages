@@ -86,8 +86,20 @@ InterpretResult run() {
 
 InterpretResult
 interpret(const char *source) {
-  compile(source);
-  return INTERPRET_OKAY;
+  Chunk chunk;
+  InterpretResult result;
+  chunk_init(&chunk);
+  if (!compile(source, &chunk)) {
+    chunk_delete(&chunk);
+    result = INTERPRET_COMPILE_ERROR;
+  }
+  else {
+    vm.chunk = &chunk;
+    vm.ip = chunk.code;
+    result = run();
+  }
+  chunk_delete(&chunk);
+  return result;
 }
 
 void repl() {

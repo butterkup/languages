@@ -58,6 +58,10 @@ bool is_at_end() {
 
 int lexlen();
 
+bool isalphanum(char c) {
+  return c == '_' || isalnum(c);
+}
+
 Token make_token(TokenType type) {
   Token token;
   token.type = type;
@@ -129,8 +133,8 @@ Token number() {
 }
 
 TokenType check_keyword(int start, int length, const char *rest, TokenType type) {
-  if (scanner.current - scanner.start == start + length
-    && memcmp(scanner.start + start, rest, length))
+  if (lexlen() == start + length &&
+    !memcmp(scanner.start + start, rest, length))
     return type;
   return TOKEN_IDENTIFIER;
 }
@@ -183,12 +187,12 @@ Token scan() {
     return make_token(TOKEN_EOF);
   char c = advance();
   if (isdigit(c)) return number();
-  if (isalpha(c)) return identifier();
+  if (isalphanum(c)) return identifier();
   switch (c) {
-  case '(': return make_token(TOKEN_RIGHT_PAREN);
-  case ')': return make_token(TOKEN_LEFT_PAREN);
-  case '{': return make_token(TOKEN_RIGHT_BRACE);
-  case '}': return make_token(TOKEN_LEFT_BRACE);
+  case '(': return make_token(TOKEN_LEFT_PAREN);
+  case ')': return make_token(TOKEN_RIGHT_PAREN);
+  case '{': return make_token(TOKEN_LEFT_BRACE);
+  case '}': return make_token(TOKEN_RIGHT_BRACE);
   case ';': return make_token(TOKEN_SEMICOLON);
   case ',': return make_token(TOKEN_COMMA);
   case '.': return make_token(TOKEN_DOT);
@@ -211,50 +215,50 @@ Token scan() {
   return error_token("Unexpected character.");
 }
 
-#define CSTKTP(type) case TOKEN_##type: return #type
+#define CSTKTP(type) case TOKEN##type: return #type + 1
 
 const char *tokentype_print(TokenType type) {
   switch (type) {
-    CSTKTP(LEFT_PAREN);
-    CSTKTP(RIGHT_PAREN);
-    CSTKTP(LEFT_BRACE);
-    CSTKTP(RIGHT_BRACE);
-    CSTKTP(DOT);
-    CSTKTP(COMMA);
-    CSTKTP(MINUS);
-    CSTKTP(PLUS);
-    CSTKTP(SEMICOLON);
-    CSTKTP(SLASH);
-    CSTKTP(STAR);
-    CSTKTP(BANG);
-    CSTKTP(BANG_EQUAL);
-    CSTKTP(EQUAL);
-    CSTKTP(EQUAL_EQUAL);
-    CSTKTP(GREATER);
-    CSTKTP(GREATER_EQUAL);
-    CSTKTP(LESS);
-    CSTKTP(LESS_EQUAL);
-    CSTKTP(NUMBER);
-    CSTKTP(STRING);
-    CSTKTP(IDENTIFIER);
-    CSTKTP(AND);
-    CSTKTP(OR);
-    CSTKTP(CLASS);
-    CSTKTP(ELSE);
-    CSTKTP(FALSE);
-    CSTKTP(TRUE);
-    CSTKTP(FOR);
-    CSTKTP(FUN);
-    CSTKTP(IF);
-    CSTKTP(NIL);
-    CSTKTP(PRINT);
-    CSTKTP(RETURN);
-    CSTKTP(SUPER);
-    CSTKTP(THIS);
-    CSTKTP(VAR);
-    CSTKTP(WHILE);
-    CSTKTP(ERROR);
-  case TOKEN_EOF: return "EOF";
+    CSTKTP(_LEFT_PAREN);
+    CSTKTP(_RIGHT_PAREN);
+    CSTKTP(_LEFT_BRACE);
+    CSTKTP(_RIGHT_BRACE);
+    CSTKTP(_COMMA);
+    CSTKTP(_DOT);
+    CSTKTP(_MINUS);
+    CSTKTP(_PLUS);
+    CSTKTP(_SEMICOLON);
+    CSTKTP(_SLASH);
+    CSTKTP(_STAR);
+    CSTKTP(_BANG);
+    CSTKTP(_BANG_EQUAL);
+    CSTKTP(_EQUAL);
+    CSTKTP(_EQUAL_EQUAL);
+    CSTKTP(_GREATER);
+    CSTKTP(_GREATER_EQUAL);
+    CSTKTP(_LESS);
+    CSTKTP(_LESS_EQUAL);
+    CSTKTP(_IDENTIFIER);
+    CSTKTP(_STRING);
+    CSTKTP(_NUMBER);
+    CSTKTP(_AND);
+    CSTKTP(_CLASS);
+    CSTKTP(_ELSE);
+    CSTKTP(_FALSE);
+    CSTKTP(_FOR);
+    CSTKTP(_FUN);
+    CSTKTP(_IF);
+    CSTKTP(_NIL);
+    CSTKTP(_OR);
+    CSTKTP(_PRINT);
+    CSTKTP(_RETURN);
+    CSTKTP(_SUPER);
+    CSTKTP(_THIS);
+    CSTKTP(_TRUE);
+    CSTKTP(_VAR);
+    CSTKTP(_WHILE);
+    CSTKTP(_ERROR);
+    CSTKTP(_EOF);
   }
   return "<UNKNOWN>";
 }
