@@ -15,11 +15,11 @@ typedef enum {
   OP_RETURN,
   OP_NEGATE,
   OP_ADD,
-} OpCode;
+} OpCode; // Instruction Bytes
 
 typedef struct {
   ValueArray constants;
-  uint8_t *code;
+  uint8_t *code; // Compiled Bytecode: from compile
   int capacity;
   int *lines;
   int count;

@@ -62,22 +62,21 @@ bool isalphanum(char c) {
   return c == '_' || isalnum(c);
 }
 
-Token make_token(TokenType type) {
+Token _make_token_impl(TokenType type, const char *start, int length) {
   Token token;
   token.type = type;
-  token.start = scanner.start;
-  token.length = lexlen();
+  token.start = start;
+  token.length = length;
   token.line = scanner.line;
   return token;
 }
 
+Token make_token(TokenType type) {
+  return _make_token_impl(type, scanner.start, lexlen());
+}
+
 Token error_token(const char *message) {
-  Token token;
-  token.type = TOKEN_ERROR;
-  token.start = message;
-  token.length = (int)strlen(message);
-  token.line = scanner.line;
-  return token;
+  return _make_token_impl(TOKEN_ERROR, message, (int)strlen(message));
 }
 
 char peek() {
@@ -85,7 +84,7 @@ char peek() {
 }
 
 char peek_next() {
-  return *(scanner.current + !is_at_end());
+  return *(scanner.current + 1);
 }
 
 char advance() {
@@ -112,14 +111,10 @@ Token string() {
 void skip_whitespace() {
   for (;;)
     switch (peek()) {
-    case '\n':
-      scanner.line++;
+    default: return;
+    case '\n': scanner.line++;
     case ' ':
-    case '\t':
-      advance();
-      break;
-    default:
-      return;
+    case '\t': advance();
     }
 }
 
@@ -176,8 +171,41 @@ TokenType identifier_type() {
 }
 
 Token identifier() {
-  while (isalnum(peek())) advance();
+  while (isalphanum(peek())) advance();
   return make_token(identifier_type());
+}
+
+Token scan();
+
+bool _consume_multiline_comment() {
+  for (;;)
+    if (is_at_end()) return false;
+    else switch (advance()) {
+    case '\n': scanner.line++;
+    case '*': if (match('/')) return true;
+    }
+}
+
+void _consume_oneline_comment() {
+  while (peek() != '\n' && !is_at_end()) advance();
+}
+
+bool match_comment() {
+  switch (peek()) {
+  case '/':
+  case '*': return true;
+  default: return false;
+  }
+}
+
+Token consume_tk_comment() {
+  switch (advance()) {
+  case '/': _consume_oneline_comment(); break;
+  case '*':
+    if (!_consume_multiline_comment())
+      return error_token("Unterminated multiline comment.");
+  }
+  return scan();
 }
 
 Token scan() {
@@ -189,35 +217,29 @@ Token scan() {
   if (isdigit(c)) return number();
   if (isalphanum(c)) return identifier();
   switch (c) {
-  case '(': return make_token(TOKEN_LEFT_PAREN);
-  case ')': return make_token(TOKEN_RIGHT_PAREN);
-  case '{': return make_token(TOKEN_LEFT_BRACE);
-  case '}': return make_token(TOKEN_RIGHT_BRACE);
-  case ';': return make_token(TOKEN_SEMICOLON);
-  case ',': return make_token(TOKEN_COMMA);
+  case '"': return string();
   case '.': return make_token(TOKEN_DOT);
-  case '-': return make_token(TOKEN_MINUS);
   case '+': return make_token(TOKEN_PLUS);
   case '*': return make_token(TOKEN_STAR);
-  case '/':
-    if (peek_next() == '/')
-      while (peek() != '\n' && !is_at_end())
-        advance();
-    else
-      return make_token(TOKEN_SLASH);
-    return scan();
+  case ',': return make_token(TOKEN_COMMA);
+  case '-': return make_token(TOKEN_MINUS);
+  case ';': return make_token(TOKEN_SEMICOLON);
+  case '(': return make_token(TOKEN_LEFT_PAREN);
+  case '{': return make_token(TOKEN_LEFT_BRACE);
+  case ')': return make_token(TOKEN_RIGHT_PAREN);
+  case '}': return make_token(TOKEN_RIGHT_BRACE);
   case '!': return make_token(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-  case '>': return make_token(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
   case '<': return make_token(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
   case '=': return make_token(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-  case '"': return string();
+  case '>': return make_token(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+  case '/': return match_comment() ? consume_tk_comment() : make_token(TOKEN_SLASH);
+  default:  return error_token("Unexpected character.");
   }
-  return error_token("Unexpected character.");
 }
 
 #define CSTKTP(type) case TOKEN##type: return #type + 1
 
-const char *tokentype_print(TokenType type) {
+const char *strtokentype(TokenType type) {
   switch (type) {
     CSTKTP(_LEFT_PAREN);
     CSTKTP(_RIGHT_PAREN);
@@ -267,7 +289,7 @@ const char *tokentype_print(TokenType type) {
 
 void token_print(Token *token) {
   printf("Token(%s, '%.*s', %d)\n",
-    tokentype_print(token->type),
+    strtokentype(token->type),
     token->length,
     token->start,
     token->line

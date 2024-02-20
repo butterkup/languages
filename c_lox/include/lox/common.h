@@ -26,6 +26,8 @@
 # endif
 #endif
 
-// #define CLOX_DEBUG_TRACE
+// #define CLOX_STACK_TRACE
+// #define CLOX_INST_TRACE
+// #define CLOX_SCAN_TRACE
 
 #endif //_CLOX_COMMON_H

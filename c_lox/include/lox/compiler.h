@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "scanner.h"
+#include "chunk.h"
 
 CLOX_BEG_DECLS
 
@@ -31,17 +32,17 @@ typedef struct {
 typedef struct {
   Token current;
   Token previous;
-  bool had_error;
-  bool panic_mode;
+  bool had_error; // Signifies a compilation error
+  bool panic_mode; // Helps in resynchronizing after an error
 } Parser;
 
-#define TKPREC_RULE(tktp, pref, inf, prec) [TOKEN##tktp] = { pref, inf, PREC##prec }
-
-void expr_binaru();
+void expr_binary();
 void expr_unary();
 void expression();
 void expr_grouping();
 void expr_number();
+
+#define TKPREC_RULE(tktp, prefix, infix, precedence) [TOKEN##tktp] = { prefix, infix, PREC##precedence }
 
 ParserRule tkprec_rules[] = {
   TKPREC_RULE(_LEFT_PAREN,     expr_grouping,  NULL,         _NONE),
@@ -50,11 +51,11 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_RIGHT_BRACE,    NULL,           NULL,         _NONE),
   TKPREC_RULE(_COMMA,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_DOT,            NULL,           NULL,         _NONE),
-  TKPREC_RULE(_MINUS,          expr_unary,     expr_binaru,  _TERM),
-  TKPREC_RULE(_PLUS,           NULL,           expr_binaru,  _TERM),
+  TKPREC_RULE(_MINUS,          expr_unary,     expr_binary,  _TERM),
+  TKPREC_RULE(_PLUS,           NULL,           expr_binary,  _TERM),
   TKPREC_RULE(_SEMICOLON,      NULL,           NULL,         _NONE),
-  TKPREC_RULE(_SLASH,          NULL,           expr_binaru,  _FACTOR),
-  TKPREC_RULE(_STAR,           NULL,           expr_binaru,  _FACTOR),
+  TKPREC_RULE(_SLASH,          NULL,           expr_binary,  _FACTOR),
+  TKPREC_RULE(_STAR,           NULL,           expr_binary,  _FACTOR),
   TKPREC_RULE(_BANG,           NULL,           NULL,         _NONE),
   TKPREC_RULE(_BANG_EQUAL,     NULL,           NULL,         _NONE),
   TKPREC_RULE(_EQUAL,          NULL,           NULL,         _NONE),
@@ -100,6 +101,7 @@ Chunk *active_chunk;
 void _error_at(Token *token, const char *message) {
   if (parser.panic_mode) return;
   parser.panic_mode = true;
+  parser.had_error = true;
   fprintf(stderr, "[line %d] Error", token->line);
   switch (token->type) {
   case TOKEN_EOF: fprintf(stderr, " at end"); break;
@@ -107,7 +109,6 @@ void _error_at(Token *token, const char *message) {
   default: fprintf(stderr, " at '%.*s'", token->length, token->start);
   }
   fprintf(stderr, ": %s\n", message);
-  parser.had_error = true;
 }
 
 void error(const char *message) {
@@ -122,8 +123,11 @@ void compiler_advance() {
   parser.previous = parser.current;
   for (;;) {
     parser.current = scan();
-    if (parser.current.type != TOKEN_ERROR)
-      break;
+#ifdef CLOX_SCAN_TRACE
+    if (parser.previous.type != TOKEN_EOF)
+      token_print(&parser.current);
+#endif
+    if (parser.current.type != TOKEN_ERROR) break;
     error_at(parser.current.start);
   }
 }
@@ -151,11 +155,9 @@ void emit_return() {
 
 uint8_t make_constant(double constant) {
   int location = chunk_cappend(current_chunk(), constant);
-  if (location > UINT8_MAX) {
-    error("Too many constants in one chunk.");
-    return 0;
-  }
-  return (uint8_t)location;
+  if (location <= UINT8_MAX) return (uint8_t)location;
+  error("Too many constants in one chunk.");
+  return 0;
 }
 
 void emit_constant(double constant) {
@@ -172,15 +174,15 @@ void expr_grouping() {
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
-void expr_binaru() {
+void expr_binary() {
   TokenType optype = parser.previous.type;
   ParserRule *rule = get_rule(optype);
   parse_precedence((Precedence)(rule->precedence + 1));
   switch (optype) {
-  case TOKEN_PLUS: emit_byte(OP_ADD); break;
+  case TOKEN_PLUS:  emit_byte(OP_ADD);      break;
+  case TOKEN_SLASH: emit_byte(OP_DIVIDE);   break;
+  case TOKEN_STAR:  emit_byte(OP_MULTIPLY); break;
   case TOKEN_MINUS: emit_byte(OP_SUBTRACT); break;
-  case TOKEN_STAR: emit_byte(OP_MULTIPLY); break;
-  case TOKEN_SLASH: emit_byte(OP_DIVIDE); break;
   }
 }
 

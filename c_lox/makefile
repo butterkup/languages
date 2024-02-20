@@ -1,10 +1,10 @@
-CC=gcc -std=c2x
+CC=gcc -std=c2x -O0
 IPATH=./include
 
 all: install
 
 clox: main.c
-	${CC} -o $@ -I${IPATH} $^
+	${CC} ${CLOX_MACRO} -o $@ -I${IPATH} $^
 
 clean:
 	rm -rfv clox
@@ -17,3 +17,5 @@ u: uninstall
 install: clox
 	mv clox ../bin
 	echo installed '../bin/clox'
+
+i: install

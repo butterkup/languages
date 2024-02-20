@@ -47,14 +47,16 @@ Value pop() {
 InterpretResult run() {
   uint8_t instruction;
   for (;;) {
-#ifdef CLOX_DEBUG_TRACE
-    printf("--> [");
+#ifdef CLOX_STACK_TRACE
+    printf("STACK [");
     for (Value *slot = vm.stack; slot < vm.stack_top; slot++) {
       value_print(*slot);
       if (slot + 1 != vm.stack_top)
         printf(", ");
     }
     printf("]\n");
+#endif
+#ifdef CLOX_INST_TRACE
     disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
     switch (instruction = READ_BYTE()) {
@@ -89,15 +91,11 @@ interpret(const char *source) {
   Chunk chunk;
   InterpretResult result;
   chunk_init(&chunk);
-  if (!compile(source, &chunk)) {
-    chunk_delete(&chunk);
-    result = INTERPRET_COMPILE_ERROR;
-  }
-  else {
+  if (compile(source, &chunk)) {
     vm.chunk = &chunk;
     vm.ip = chunk.code;
     result = run();
-  }
+  } else result = INTERPRET_COMPILE_ERROR;
   chunk_delete(&chunk);
   return result;
 }
@@ -106,7 +104,6 @@ void repl() {
   char line[1024];
   for (;;) {
     printf("> ");
-
     if (!fgets(line, sizeof(line), stdin)) {
       printf("\n");
       break;
@@ -119,7 +116,7 @@ void repl() {
 char *read_file(const char *path) {
   FILE *file = fopen(path, "rb");
   if (file == NULL) {
-    fputs("Cannot open file.", stderr);
+    fputs("Cannot open file.\n", stderr);
     exit(74);
   }
   fseek(file, 0L, SEEK_END);
@@ -127,12 +124,12 @@ char *read_file(const char *path) {
   rewind(file);
   char *buffer = (char *)malloc(file_size + 1);
   if (buffer == NULL) {
-    fputs("Cannot allocate enough memory.", stderr);
+    fputs("Cannot allocate enough memory.\n", stderr);
     exit(74);
   }
   size_t bytes_read = fread(buffer, sizeof(char), file_size, file);
   if (bytes_read < file_size) {
-    fputs("Could not load whole file.", stderr);
+    fputs("Could not load whole file.\n", stderr);
     exit(74);
   }
   buffer[bytes_read] = '\0';
