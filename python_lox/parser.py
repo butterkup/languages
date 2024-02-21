@@ -123,9 +123,10 @@ class Parser:
         parameters = []
         while self.match(TokenType.IDENTIFIER):
             parameters.append(self.previous())
-            self.match(TokenType.COMMA)
+            if not self.match(TokenType.COMMA):
+                break
         self.consume(TokenType.RIGHT_PAREN, "Expected ')' after function parameters.")
-        self.consume(TokenType.LEFT_BRACE, "Expected '{' after function parameters.")
+        self.consume(TokenType.LEFT_BRACE, "Expected '{' after function declaration.")
         if not len(set(ps := [p.lexeme for p in parameters])) == len(parameters):
             self.reporter.error(
                 fname.line,

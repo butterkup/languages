@@ -7,7 +7,32 @@
 
 CLOX_BEG_DECLS
 
-typedef double Value;
+typedef enum {
+  VAL_NIL,
+  VAL_BOOL,
+  VAL_NUMBER,
+} ValueType;
+
+typedef struct {
+  ValueType type;
+  union {
+    bool boolean;
+    double number;
+  } payload;
+} Value;
+
+
+#define IS_NIL(value) ((value).type == VAL_NIL)
+#define IS_BOOL(value) ((value).type == VAL_BOOL)
+#define IS_NUMBER(value) ((value).type == VAL_NUMBER)
+
+#define AS_BOOL(value) ((value).payload.boolean)
+#define AS_NUMBER(value) ((value).payload.number)
+
+#define NIL_VAL ((Value){ .type=VAL_NIL, .payload={ .number = 0 } })
+#define BOOL_VAL(value) ((Value){ .type=VAL_BOOL, .payload={ .boolean = value } })
+#define NUMBER_VAL(value) ((Value){ .type=VAL_NUMBER, .payload={ .number = value } })
+
 
 typedef struct {
   Value *values;
@@ -37,7 +62,11 @@ void value_append(ValueArray *array, Value value) {
 }
 
 void value_print(Value value) {
-  printf("%g", value);
+  switch (value.type) {
+  case VAL_BOOL:    printf(AS_BOOL(value) ? "true" : "false"); break;
+  case VAL_NUMBER: printf("%g", AS_NUMBER(value));             break;
+  case VAL_NIL: printf("nil");                                 break;
+  }
 }
 
 CLOX_END_DECLS

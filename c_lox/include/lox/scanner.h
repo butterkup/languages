@@ -211,8 +211,7 @@ Token consume_tk_comment() {
 Token scan() {
   skip_whitespace();
   scanner.start = scanner.current;
-  if (is_at_end())
-    return make_token(TOKEN_EOF);
+  if (is_at_end()) return make_token(TOKEN_EOF);
   char c = advance();
   if (isdigit(c)) return number();
   if (isalphanum(c)) return identifier();

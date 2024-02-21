@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 # define CLOX_BEG_DECLS extern "C" {

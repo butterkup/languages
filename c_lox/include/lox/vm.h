@@ -12,11 +12,15 @@ CLOX_BEG_DECLS
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define STACK_MAX 256
-#define BINARY_OP(op)   \
-  do {                  \
-    Value b = pop();    \
-    Value a = pop();    \
-    push(a op b);       \
+#define BINARY_OP(Type, op)                                          \
+  do {                                                               \
+    if (!IS_NUMBER(stack_peek(0)) || !IS_NUMBER(stack_peek(1))) {    \
+      runtime_error("Operands must be numbers.");                    \
+      return INTERPRET_RUNTIME_ERROR;                                \
+    }                                                                \
+    double b = AS_NUMBER(stack_pop());                               \
+    double a = AS_NUMBER(stack_pop());                               \
+    push(Type(a op b));                                              \
   } while(false)
 
 typedef struct {
@@ -39,9 +43,40 @@ void push(Value value) {
   vm.stack_top++;
 }
 
-Value pop() {
+Value stack_pop() {
   vm.stack_top--;
   return *vm.stack_top;
+}
+
+Value stack_peek(int distance) {
+  return vm.stack_top[-1 - distance];
+}
+
+void reset_stack();
+
+void runtime_error(const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  fputc('\n', stderr);
+  size_t instruction = vm.ip - vm.chunk->code - 1;
+  int line = vm.chunk->lines[instruction];
+  fprintf(stderr, "[line %d] in script\n", line);
+  reset_stack();
+}
+
+bool is_false(Value value) {
+  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+bool values_equal(Value a, Value b) {
+  if (a.type != b.type) return false;
+  switch (a.type) {
+  case VAL_NIL: return true;
+  case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
+  case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+  }
 }
 
 InterpretResult run() {
@@ -60,28 +95,31 @@ InterpretResult run() {
     disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
     switch (instruction = READ_BYTE()) {
+    case OP_NIL:      push(NIL_VAL);                         break;
+    case OP_TRUE:     push(BOOL_VAL(true));                  break;
+    case OP_FALSE:    push(BOOL_VAL(false));                 break;
+    case OP_CONSTANT: push(READ_CONSTANT());                 break;
+    case OP_ADD:      BINARY_OP(NUMBER_VAL, +);              break;
+    case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *);              break;
+    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, / );             break;
+    case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -);              break;
+    case OP_NOT:      push(BOOL_VAL(is_false(stack_pop()))); break;
+    case OP_LESS:     BINARY_OP(BOOL_VAL, <);              break;
+    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);              break;
+    case OP_EQUAL:
+      Value b = stack_pop();
+      Value a = stack_pop();
+      push(BOOL_VAL(values_equal(a, b)));
+      break;
     case OP_RETURN:
-      value_print(pop());
-      printf("\n");
+      value_print(stack_pop()); printf("\n");
       return INTERPRET_OKAY;
-    case OP_CONSTANT:
-      push(READ_CONSTANT());
-      break;
     case OP_NEGATE:
-      push(-pop());
-      break;
-    case OP_ADD:
-      BINARY_OP(+);
-      break;
-    case OP_MULTIPLY:
-      BINARY_OP(*);
-      break;
-    case OP_DIVIDE:
-      BINARY_OP(/ );
-      break;
-    case OP_SUBTRACT:
-      BINARY_OP(-);
-      break;
+      if (!IS_NUMBER(stack_peek(0))) {
+        runtime_error("Operand must be a number.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      push(NUMBER_VAL(-AS_NUMBER(stack_pop())));break;
     }
   }
 }
@@ -95,7 +133,8 @@ interpret(const char *source) {
     vm.chunk = &chunk;
     vm.ip = chunk.code;
     result = run();
-  } else result = INTERPRET_COMPILE_ERROR;
+  }
+  else result = INTERPRET_COMPILE_ERROR;
   chunk_delete(&chunk);
   return result;
 }

@@ -41,6 +41,7 @@ void expr_unary();
 void expression();
 void expr_grouping();
 void expr_number();
+void literal();
 
 #define TKPREC_RULE(tktp, prefix, infix, precedence) [TOKEN##tktp] = { prefix, infix, PREC##precedence }
 
@@ -56,31 +57,31 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_SEMICOLON,      NULL,           NULL,         _NONE),
   TKPREC_RULE(_SLASH,          NULL,           expr_binary,  _FACTOR),
   TKPREC_RULE(_STAR,           NULL,           expr_binary,  _FACTOR),
-  TKPREC_RULE(_BANG,           NULL,           NULL,         _NONE),
-  TKPREC_RULE(_BANG_EQUAL,     NULL,           NULL,         _NONE),
+  TKPREC_RULE(_BANG,           expr_unary,     NULL,         _NONE),
+  TKPREC_RULE(_BANG_EQUAL,     NULL,           expr_binary,  _EQUALITY),
   TKPREC_RULE(_EQUAL,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_EQUAL_EQUAL,    NULL,           NULL,         _NONE),
-  TKPREC_RULE(_GREATER,        NULL,           NULL,         _NONE),
-  TKPREC_RULE(_GREATER_EQUAL,  NULL,           NULL,         _NONE),
-  TKPREC_RULE(_LESS,           NULL,           NULL,         _NONE),
-  TKPREC_RULE(_LESS_EQUAL,     NULL,           NULL,         _NONE),
+  TKPREC_RULE(_EQUAL_EQUAL,    NULL,           expr_binary,  _EQUALITY),
+  TKPREC_RULE(_GREATER,        NULL,           expr_binary,  _COMPARISON),
+  TKPREC_RULE(_GREATER_EQUAL,  NULL,           expr_binary,  _COMPARISON),
+  TKPREC_RULE(_LESS,           NULL,           expr_binary,  _COMPARISON),
+  TKPREC_RULE(_LESS_EQUAL,     NULL,           expr_binary,  _COMPARISON),
   TKPREC_RULE(_IDENTIFIER,     NULL,           NULL,         _NONE),
   TKPREC_RULE(_STRING,         NULL,           NULL,         _NONE),
   TKPREC_RULE(_NUMBER,         expr_number,    NULL,         _NONE),
   TKPREC_RULE(_AND,            NULL,           NULL,         _NONE),
   TKPREC_RULE(_CLASS,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_ELSE,           NULL,           NULL,         _NONE),
-  TKPREC_RULE(_FALSE,          NULL,           NULL,         _NONE),
+  TKPREC_RULE(_FALSE,          literal,        NULL,         _NONE),
   TKPREC_RULE(_FOR,            NULL,           NULL,         _NONE),
   TKPREC_RULE(_FUN,            NULL,           NULL,         _NONE),
   TKPREC_RULE(_IF,             NULL,           NULL,         _NONE),
-  TKPREC_RULE(_NIL,            NULL,           NULL,         _NONE),
+  TKPREC_RULE(_NIL,            literal,        NULL,         _NONE),
   TKPREC_RULE(_OR,             NULL,           NULL,         _NONE),
   TKPREC_RULE(_PRINT,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_RETURN,         NULL,           NULL,         _NONE),
   TKPREC_RULE(_SUPER,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_THIS,           NULL,           NULL,         _NONE),
-  TKPREC_RULE(_TRUE,           NULL,           NULL,         _NONE),
+  TKPREC_RULE(_TRUE,           literal,        NULL,         _NONE),
   TKPREC_RULE(_VAR,            NULL,           NULL,         _NONE),
   TKPREC_RULE(_WHILE,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_ERROR,          NULL,           NULL,         _NONE),
@@ -124,7 +125,7 @@ void compiler_advance() {
   for (;;) {
     parser.current = scan();
 #ifdef CLOX_SCAN_TRACE
-    if (parser.previous.type != TOKEN_EOF)
+    if (!is_at_end() || parser.previous.type != TOKEN_EOF)
       token_print(&parser.current);
 #endif
     if (parser.current.type != TOKEN_ERROR) break;
@@ -153,20 +154,28 @@ void emit_return() {
   emit_byte(OP_RETURN);
 }
 
-uint8_t make_constant(double constant) {
+uint8_t make_constant(Value constant) {
   int location = chunk_cappend(current_chunk(), constant);
   if (location <= UINT8_MAX) return (uint8_t)location;
   error("Too many constants in one chunk.");
   return 0;
 }
 
-void emit_constant(double constant) {
+void emit_constant(Value constant) {
   emit_bytes(OP_CONSTANT, make_constant(constant));
+}
+
+void literal() {
+  switch (parser.previous.type) {
+  case TOKEN_NIL: emit_byte(OP_NIL);     break;
+  case TOKEN_TRUE: emit_byte(OP_TRUE);   break;
+  case TOKEN_FALSE: emit_byte(OP_FALSE); break;
+  }
 }
 
 void expr_number() {
   double constant = strtod(parser.previous.start, NULL);
-  emit_constant(constant);
+  emit_constant(NUMBER_VAL(constant));
 }
 
 void expr_grouping() {
@@ -179,10 +188,16 @@ void expr_binary() {
   ParserRule *rule = get_rule(optype);
   parse_precedence((Precedence)(rule->precedence + 1));
   switch (optype) {
-  case TOKEN_PLUS:  emit_byte(OP_ADD);      break;
-  case TOKEN_SLASH: emit_byte(OP_DIVIDE);   break;
-  case TOKEN_STAR:  emit_byte(OP_MULTIPLY); break;
-  case TOKEN_MINUS: emit_byte(OP_SUBTRACT); break;
+  case TOKEN_LESS: emit_byte(OP_LESS);                   break;
+  case TOKEN_PLUS:  emit_byte(OP_ADD);                   break;
+  case TOKEN_SLASH: emit_byte(OP_DIVIDE);                break;
+  case TOKEN_STAR:  emit_byte(OP_MULTIPLY);              break;
+  case TOKEN_MINUS: emit_byte(OP_SUBTRACT);              break;
+  case TOKEN_GREATER: emit_byte(OP_GREATER);             break;
+  case TOKEN_EQUAL_EQUAL: emit_byte(OP_EQUAL);           break;
+  case TOKEN_BANG_EQUAL: emit_bytes(OP_EQUAL, OP_NOT);   break;
+  case TOKEN_LESS_EQUAL: emit_bytes(OP_GREATER, OP_NOT); break;
+  case TOKEN_GREATER_EQUAL: emit_bytes(OP_LESS, OP_NOT); break;
   }
 }
 
@@ -190,6 +205,7 @@ void expr_unary() {
   TokenType optype = parser.previous.type;
   parse_precedence(PREC_UNARY);
   switch (optype) {
+  case TOKEN_BANG: emit_byte(OP_NOT);     break;
   case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
   }
 }
@@ -210,9 +226,9 @@ void expression() {
 }
 
 void compiler_init(Chunk *chunk) {
-  active_chunk = chunk;
   parser.panic_mode = false;
   parser.had_error = false;
+  active_chunk = chunk;
 }
 
 void compiler_delete() {
