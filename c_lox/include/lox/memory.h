@@ -5,14 +5,20 @@
 
 CLOX_BEG_DECLS
 
-#define GROW_CAPACITY(cap) \
-  (cap < 8? 8 : cap * 2)
+#define GROW_CAPACITY(capacity) \
+  (capacity < 8? 8 : capacity * 2)
 
-#define GROW_ARRAY(type, begptr, oldcap, cap) \
-  (type*)reallocate(begptr, sizeof(type) * oldcap, sizeof(type) * cap)
+#define GROW_ARRAY(type, begptr, oldcap, capacity) \
+  (type*)reallocate(begptr, sizeof(type) * oldcap, sizeof(type) * capacity)
 
-#define FREE_ARRAY(type, begptr, cap) \
-  reallocate(begptr, sizeof(type) * cap, 0)
+#define FREE_ARRAY(type, begptr, capacity) \
+  reallocate(begptr, sizeof(type) * capacity, 0)
+
+#define FREE(type, ptr) \
+  reallocate(ptr, sizeof(type), 0)
+
+#define ALLOCATE(Type, Size) \
+  (Type *)reallocate(NULL, 0, sizeof(Type) * (Size))
 
 void *reallocate(void *ptr, size_t osize, size_t nsize) {
   if (nsize == 0) {

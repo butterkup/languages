@@ -52,15 +52,10 @@ void scanner_init(const char *source) {
   scanner.current = source;
 }
 
-bool is_at_end() {
-  return *scanner.current == '\0';
-}
+bool is_at_end() { return *scanner.current == '\0'; }
+bool isalphanum(char c) { return c == '_' || isalnum(c); }
 
 int lexlen();
-
-bool isalphanum(char c) {
-  return c == '_' || isalnum(c);
-}
 
 Token _make_token_impl(TokenType type, const char *start, int length) {
   Token token;
@@ -79,31 +74,21 @@ Token error_token(const char *message) {
   return _make_token_impl(TOKEN_ERROR, message, (int)strlen(message));
 }
 
-char peek() {
-  return *scanner.current;
-}
-
-char peek_next() {
-  return *(scanner.current + 1);
-}
-
-char advance() {
-  return *scanner.current++;
-}
+char peek() { return *scanner.current; }
+char advance() { return *scanner.current++; }
+char peek_next() { return *(scanner.current + 1); }
 
 bool match(char expected) {
-  if (is_at_end() || peek() != expected)
+  if (peek() != expected)
     return false;
-  advance();
-  return true;
+  advance(); return true;
 }
 
 Token string() {
-  while (peek() != '"' && !is_at_end())
-    if (advance() == '\n')
-      scanner.line++;
-  if (is_at_end())
-    return error_token("Unterminated string.");
+  while (peek() != '"')
+    if (advance() == '\n') scanner.line++;
+    else if (is_at_end())
+      return error_token("Unterminated string.");
   advance(); // Consume the closing quote
   return make_token(TOKEN_STRING);
 }
@@ -120,10 +105,8 @@ void skip_whitespace() {
 
 Token number() {
   while (isdigit(peek())) advance();
-  if (peek() == '.' && isdigit(peek_next())) {
-    advance();
+  if (match('.') && isdigit(peek_next()))
     while (isdigit(peek())) advance();
-  }
   return make_token(TOKEN_NUMBER);
 }
 
@@ -134,9 +117,7 @@ TokenType check_keyword(int start, int length, const char *rest, TokenType type)
   return TOKEN_IDENTIFIER;
 }
 
-int lexlen() {
-  return (int)(scanner.current - scanner.start);
-}
+int lexlen() { return (int)(scanner.current - scanner.start); }
 
 TokenType identifier_type() {
   switch (*scanner.start) {
@@ -204,8 +185,8 @@ Token consume_tk_comment() {
   case '*':
     if (!_consume_multiline_comment())
       return error_token("Unterminated multiline comment.");
+  default: return scan();
   }
-  return scan();
 }
 
 Token scan() {

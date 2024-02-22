@@ -12,6 +12,7 @@ else
     export PATH="$__tmp_ROOT:$PATH"
   else
     __clox_PATH_ALREADY_SETUP=true
+    exit 1
   fi
 fi
 
@@ -24,6 +25,7 @@ declare -A __P_active_clox_defs
 __P_clox_defs["stack"]=CLOX_STACK_TRACE
 __P_clox_defs["scan"]=CLOX_SCAN_TRACE
 __P_clox_defs["inst"]=CLOX_INST_TRACE
+__P_clox_defs["odel"]=CLOX_ODEL_TRACE
 
 function _in_array() {
   local value="$1"
@@ -71,7 +73,6 @@ function clox_undef() {
       unset __P_active_clox_defs["$macro"]
     else
       echo >&2 "Unknown definition: '$macro'."
-      echo >&2 "Expected one of: ${!__P_clox_defs[@]}"
       return 2
     fi
   done
@@ -80,7 +81,7 @@ function clox_undef() {
 
 function clox_mac() {
   case "$1" in
-  clr) CLOX_MACRO="" ;;
+  clr) CLOX_MACRO=""; __P_active_clox_defs=();;
   show | "") echo "CLOX_MACRO='$CLOX_MACRO'" ;;
   \? | help) _valid_clox_macros ;&
   *) echo "Valid Command: 'clr' 'show' '?' 'help' ''" ;;

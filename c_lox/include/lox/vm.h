@@ -28,6 +28,7 @@ typedef struct {
   uint8_t *ip;
   Value stack[STACK_MAX];
   Value *stack_top;
+  Object *objects;
 } Vm;
 
 typedef enum {
@@ -76,7 +77,27 @@ bool values_equal(Value a, Value b) {
   case VAL_NIL: return true;
   case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
   case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+  case VAL_OBJECT:
+    ObjectString *s1 = AS_STRING(a), *s2 = AS_STRING(b);
+    return s1->length == s2->length &&
+      !memcmp(s1->chars, s2->chars, s1->length);
   }
+}
+
+ObjectString *take_string(char *chars, int length) {
+  return allocate_string(chars, length);
+}
+
+void concatenate_string() {
+  ObjectString *b = AS_STRING(stack_pop());
+  ObjectString *a = AS_STRING(stack_pop());
+  int length = a->length + b->length;
+  char *payload = ALLOCATE(char, length + 1);
+  payload[length] = '\0';
+  memcpy(payload, a->chars, a->length);
+  memcpy(payload + a->length, b->chars, b->length);
+  ObjectString *result = take_string(payload, length);
+  push(OBJECT_VAL(result));
 }
 
 InterpretResult run() {
@@ -99,13 +120,23 @@ InterpretResult run() {
     case OP_TRUE:     push(BOOL_VAL(true));                  break;
     case OP_FALSE:    push(BOOL_VAL(false));                 break;
     case OP_CONSTANT: push(READ_CONSTANT());                 break;
-    case OP_ADD:      BINARY_OP(NUMBER_VAL, +);              break;
+    case OP_LESS:     BINARY_OP(BOOL_VAL, <);                break;
+    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);                break;
     case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *);              break;
-    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, / );             break;
     case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -);              break;
+    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, / );             break;
     case OP_NOT:      push(BOOL_VAL(is_false(stack_pop()))); break;
-    case OP_LESS:     BINARY_OP(BOOL_VAL, <);              break;
-    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);              break;
+    case OP_ADD:
+      if (IS_STRING(stack_peek(0)) && IS_STRING(stack_peek(1)))
+        concatenate_string();
+      else if (IS_NUMBER(stack_peek(0)) && IS_NUMBER(stack_peek(1))) {
+        double b = AS_NUMBER(stack_pop());
+        double a = AS_NUMBER(stack_pop());
+        push(NUMBER_VAL(a + b));
+      } else {
+        runtime_error("Operands must be two numbers or two strings.");
+        return INTERPRET_RUNTIME_ERROR;
+      } break;
     case OP_EQUAL:
       Value b = stack_pop();
       Value a = stack_pop();
@@ -192,11 +223,19 @@ void reset_stack() {
   vm.stack_top = vm.stack;
 }
 
-void vm_init() {
-  reset_stack();
+void new_object(Object *object) {
+  object->next = vm.objects;
+  vm.objects = object;
 }
 
-void vm_delete() { }
+void vm_init() {
+  reset_stack();
+  vm.objects = NULL;
+}
+
+void vm_delete() {
+  objects_delete(vm.objects);
+}
 
 
 #undef READ_BYTE

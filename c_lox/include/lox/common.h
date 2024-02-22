@@ -30,5 +30,6 @@
 // #define CLOX_STACK_TRACE
 // #define CLOX_INST_TRACE
 // #define CLOX_SCAN_TRACE
+// #define CLOX_ODEL_TRACE
 
 #endif //_CLOX_COMMON_H

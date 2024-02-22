@@ -4,6 +4,7 @@
 #include "common.h"
 #include "scanner.h"
 #include "chunk.h"
+#include "object.h"
 
 CLOX_BEG_DECLS
 
@@ -42,6 +43,7 @@ void expression();
 void expr_grouping();
 void expr_number();
 void literal();
+void expr_string();
 
 #define TKPREC_RULE(tktp, prefix, infix, precedence) [TOKEN##tktp] = { prefix, infix, PREC##precedence }
 
@@ -66,7 +68,7 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_LESS,           NULL,           expr_binary,  _COMPARISON),
   TKPREC_RULE(_LESS_EQUAL,     NULL,           expr_binary,  _COMPARISON),
   TKPREC_RULE(_IDENTIFIER,     NULL,           NULL,         _NONE),
-  TKPREC_RULE(_STRING,         NULL,           NULL,         _NONE),
+  TKPREC_RULE(_STRING,         expr_string,    NULL,         _NONE),
   TKPREC_RULE(_NUMBER,         expr_number,    NULL,         _NONE),
   TKPREC_RULE(_AND,            NULL,           NULL,         _NONE),
   TKPREC_RULE(_CLASS,          NULL,           NULL,         _NONE),
@@ -176,6 +178,10 @@ void literal() {
 void expr_number() {
   double constant = strtod(parser.previous.start, NULL);
   emit_constant(NUMBER_VAL(constant));
+}
+
+void expr_string() {
+  emit_constant(OBJECT_VAL(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 void expr_grouping() {
