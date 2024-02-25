@@ -2,6 +2,7 @@
 #define _CLOX_VM_H
 
 #include "compiler.h"
+#include "table.h"
 #include "common.h"
 #include "chunk.h"
 #include "debug.h"
@@ -29,6 +30,7 @@ typedef struct {
   Value stack[STACK_MAX];
   Value *stack_top;
   Object *objects;
+  Table strings;
 } Vm;
 
 typedef enum {
@@ -42,6 +44,14 @@ Vm vm;
 void push(Value value) {
   *vm.stack_top = value;
   vm.stack_top++;
+}
+
+bool intern_string(ObjectString *string) {
+  return table_set(&vm.strings, string, NIL_VAL);
+}
+
+ObjectString *table_find_istring(char *payload, int size, uint32_t hash) {
+  return table_find_string(&vm.strings, payload, size, hash);
 }
 
 Value stack_pop() {
@@ -77,15 +87,18 @@ bool values_equal(Value a, Value b) {
   case VAL_NIL: return true;
   case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
   case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-  case VAL_OBJECT:
-    ObjectString *s1 = AS_STRING(a), *s2 = AS_STRING(b);
-    return s1->length == s2->length &&
-      !memcmp(s1->chars, s2->chars, s1->length);
+  case VAL_OBJECT: return AS_OBJECT(a) == AS_OBJECT(b);
   }
 }
 
 ObjectString *take_string(char *chars, int length) {
-  return allocate_string(chars, length);
+  uint32_t hash = hash_string(chars, length);
+  ObjectString *string = table_find_string(&vm.strings, chars, length, hash);
+  if (string != NULL) {
+    FREE_ARRAY(char, chars, length + 1);
+    return string;
+  }
+  return allocate_string(chars, length, hash);
 }
 
 void concatenate_string() {
@@ -182,7 +195,6 @@ void repl() {
   }
 }
 
-
 char *read_file(const char *path) {
   FILE *file = fopen(path, "rb");
   if (file == NULL) {
@@ -231,15 +243,20 @@ void new_object(Object *object) {
 void vm_init() {
   reset_stack();
   vm.objects = NULL;
+  table_init(&vm.strings);
+}
+
+void vm_intern_string(ObjectString *string) {
+  table_set(&vm.strings, string, NIL_VAL);
 }
 
 void vm_delete() {
   objects_delete(vm.objects);
+  table_delete(&vm.strings);
 }
 
-
-#undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_BYTE
 #undef STACK_MAX
 #undef BINARY_OP
 

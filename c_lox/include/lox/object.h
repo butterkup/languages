@@ -12,6 +12,8 @@
 #define ALLOCATE_OBJECT(Type, ObjectType) \
   (Type *)allocate_object(sizeof(Type), ObjectType)
 
+uint32_t hash_string(const char *, int size);
+
 typedef struct ObjectString ObjectString;
 
 typedef enum {
@@ -27,10 +29,13 @@ struct Object {
 struct ObjectString {
   Object object;
   char *chars;
+  uint32_t hash;
   int length;
 };
 
 void new_object(Object *);
+ObjectString *table_find_istring(char *, int, uint32_t);
+bool intern_string(ObjectString *);
 
 bool is_object_type(Value value, ObjectType type) {
   return IS_OBJECT(value) && OBJECT_TYPE(value) == type;
@@ -43,18 +48,23 @@ Object *allocate_object(size_t size, ObjectType type) {
   return object;
 }
 
-ObjectString *allocate_string(char *payload, int size) {
-  ObjectString *string = ALLOCATE_OBJECT(ObjectString, OBJ_STRING);
+ObjectString *allocate_string(char *payload, int size, uint32_t hash) {
+  ObjectString *string = table_find_istring(payload, size, hash);
+  if (string != NULL) return string;
+  string = ALLOCATE_OBJECT(ObjectString, OBJ_STRING);
   string->chars = payload;
   string->length = size;
+  string->hash = hash;
+  intern_string(string);
   return string;
 }
 
 ObjectString *copy_string(const char *chars, int size) {
+  uint32_t hash = hash_string(chars, size);
   char *payload = ALLOCATE(char, size + 1);
   memcpy(payload, chars, size);
   payload[size] = '\0';
-  return allocate_string(payload, size);
+  return allocate_string(payload, size, hash);
 }
 
 
@@ -72,7 +82,7 @@ void object_delete(Object *object) {
   putchar(10);
 #endif
   switch (object->type) {
-    case OBJ_STRING: 
+  case OBJ_STRING:
     ObjectString *string = (ObjectString *)object;
     FREE_ARRAY(char, string->chars, string->length + 1);
     FREE(ObjectString, object);
@@ -82,7 +92,7 @@ void object_delete(Object *object) {
 
 void objects_delete(Object *objects) {
   Object *object;
-  while(objects != NULL) {
+  while (objects != NULL) {
     object = objects;
     objects = objects->next;
     object_delete(object);
