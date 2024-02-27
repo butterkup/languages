@@ -26,8 +26,7 @@ void *reallocate(void *ptr, size_t osize, size_t nsize) {
     return NULL;
   }
   void *result = realloc(ptr, nsize);
-  if (result == NULL)
-    exit(EXIT_FAILURE);
+  if (result == NULL) exit(EXIT_FAILURE);
   return result;
 }
 

@@ -34,8 +34,8 @@ struct ObjectString {
 };
 
 void new_object(Object *);
-ObjectString *table_find_istring(char *, int, uint32_t);
 bool intern_string(ObjectString *);
+ObjectString *table_find_istring(char *, int, uint32_t);
 
 bool is_object_type(Value value, ObjectType type) {
   return IS_OBJECT(value) && OBJECT_TYPE(value) == type;
@@ -44,6 +44,7 @@ bool is_object_type(Value value, ObjectType type) {
 Object *allocate_object(size_t size, ObjectType type) {
   Object *object = (Object *)reallocate(NULL, 0, size);
   object->type = type;
+  object->next = NULL;
   new_object(object);
   return object;
 }

@@ -24,6 +24,31 @@ typedef enum {
   OP_NOT,
 } OpCode; // Instruction Bytes
 
+#define INSTCS(inst) case OP##inst: return #inst + 1
+
+const char *inst_print(uint8_t byte) {
+  switch (byte)
+  {
+  INSTCS(_CONSTANT);
+  INSTCS(_SUBTRACT);
+  INSTCS(_MULTIPLY);
+  INSTCS(_GREATER);
+  INSTCS(_DIVIDE);
+  INSTCS(_RETURN);
+  INSTCS(_NEGATE);
+  INSTCS(_FALSE);
+  INSTCS(_EQUAL);
+  INSTCS(_TRUE);
+  INSTCS(_LESS);
+  INSTCS(_NIL);
+  INSTCS(_ADD);
+  INSTCS(_NOT);
+  }
+  return "<UNKOWN_INST>";
+}
+
+#undef INSTCS
+
 typedef struct {
   ValueArray constants;
   uint8_t *code; // Compiled Bytecode: from compile
@@ -56,7 +81,6 @@ void chunk_delete(Chunk *chunk) {
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
   FREE_ARRAY(int, chunk->lines, chunk->capacity);
   value_delete(&chunk->constants);
-  chunk_init(chunk);
 }
 
 int chunk_cappend(Chunk *chunk, Value value) {

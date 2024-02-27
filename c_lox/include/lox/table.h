@@ -68,22 +68,19 @@ void table_adjust_cap(Table *table, int capacity) {
   entries = entry;
   for (capacity = old_capacity; capacity > 0; --capacity, ++entry)
     if (entry->key != NULL) {
-      entries = entry_find(table->entries, old_capacity, entry->key);
-      *entries = (Entry){ .key = entry->key, .value = entry->value };
-      table->count++;
+      *entry_find(table->entries, old_capacity, entry->key)
+        = (Entry){ .key = entry->key, .value = entry->value };
+      ++table->count;
     }
   FREE_ARRAY(Entry, entries, old_capacity);
 }
 
 bool table_set(Table *table, ObjectString *key, Value value) {
-  if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
-    int capacity = GROW_CAPACITY(table->capacity);
-    table_adjust_cap(table, capacity);
-  }
+  if (table->count + 1 > table->capacity * TABLE_MAX_LOAD)
+    table_adjust_cap(table, GROW_CAPACITY(table->capacity));
   Entry *entry = entry_find(table->entries, table->capacity, key);
   bool new_entry = entry->key == NULL;
-  if (new_entry && IS_NIL(entry->value))
-    ++table->count;
+  if (new_entry && IS_NIL(entry->value)) ++table->count;
   *entry = (Entry){ key, value };
   return new_entry;
 }

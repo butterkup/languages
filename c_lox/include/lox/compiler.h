@@ -204,6 +204,7 @@ void expr_binary() {
   case TOKEN_BANG_EQUAL: emit_bytes(OP_EQUAL, OP_NOT);   break;
   case TOKEN_LESS_EQUAL: emit_bytes(OP_GREATER, OP_NOT); break;
   case TOKEN_GREATER_EQUAL: emit_bytes(OP_LESS, OP_NOT); break;
+  default: printf("Unrecognized expr binary token type: %d\n", optype); exit(1);
   }
 }
 
@@ -213,6 +214,7 @@ void expr_unary() {
   switch (optype) {
   case TOKEN_BANG: emit_byte(OP_NOT);     break;
   case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
+  default: printf("Unrecognized expr unary token type: %d\n", optype); exit(1);
   }
 }
 

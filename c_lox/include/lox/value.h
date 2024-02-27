@@ -48,14 +48,11 @@ typedef struct {
 } ValueArray;
 
 void value_init(ValueArray *array) {
-  array->values = NULL;
-  array->capacity = 0;
-  array->count = 0;
+  *array = (ValueArray){ NULL, 0, 0 };
 }
 
 void value_delete(ValueArray *array) {
   FREE_ARRAY(Value, array->values, array->capacity);
-  value_init(array);
 }
 
 void value_append(ValueArray *array, Value value) {
