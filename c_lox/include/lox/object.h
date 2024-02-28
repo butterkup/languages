@@ -6,8 +6,8 @@
 
 #define OBJECT_TYPE(value) (AS_OBJECT(value)->type)
 #define IS_STRING(value) is_object_type(value, OBJ_STRING)
-#define AS_STRING(value) ((ObjectString *)AS_OBJECT(value))
-#define AS_CSTRING(value) (((ObjectString *)AS_OBJECT(value))->chars)
+#define AS_STRING(value) (ObjectString *)AS_OBJECT(value)
+#define AS_CSTRING(value) ((ObjectString *)AS_OBJECT(value))->chars
 
 #define ALLOCATE_OBJECT(Type, ObjectType) \
   (Type *)allocate_object(sizeof(Type), ObjectType)
@@ -71,7 +71,7 @@ ObjectString *copy_string(const char *chars, int size) {
 
 void value_oprint(Value value) {
   switch (OBJECT_TYPE(value)) {
-  case OBJ_STRING: printf("\"%s\"", AS_CSTRING(value));        break;
+  case OBJ_STRING: printf("%s", AS_CSTRING(value));          break;
   default: printf("Unknown object: %d", OBJECT_TYPE(value)); break;
   }
 }

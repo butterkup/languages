@@ -1,0 +1,11 @@
+// Global variables in CLOX are late bound
+
+// This function is okay to call after declaration
+// of global variable `global`
+fun function() {
+  print global;
+}
+
+// function(); // ERROR: Undefined variable `global`.
+var global = "GLOBAL VARIABLE VALUE";
+function(); // OKAY : `global` can be resolved.

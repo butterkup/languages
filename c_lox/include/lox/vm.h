@@ -13,6 +13,7 @@ CLOX_BEG_DECLS
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define STACK_MAX 256
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(Type, op)                                          \
   do {                                                               \
     if (!IS_NUMBER(stack_peek(0)) || !IS_NUMBER(stack_peek(1))) {    \
@@ -21,7 +22,7 @@ CLOX_BEG_DECLS
     }                                                                \
     double b = AS_NUMBER(stack_pop());                               \
     double a = AS_NUMBER(stack_pop());                               \
-    stack_push(Type(a op b));                                              \
+    stack_push(Type(a op b));                                        \
   } while(false)
 
 typedef struct {
@@ -31,6 +32,7 @@ typedef struct {
   Value *stack_top;
   Object *objects;
   Table strings;
+  Table globals;
 } Vm;
 
 typedef enum {
@@ -129,16 +131,40 @@ InterpretResult run() {
     disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
     switch (instruction = READ_BYTE()) {
+    case OP_RETURN:   return INTERPRET_OKAY;
     case OP_NIL:      stack_push(NIL_VAL);                         break;
     case OP_TRUE:     stack_push(BOOL_VAL(true));                  break;
     case OP_FALSE:    stack_push(BOOL_VAL(false));                 break;
     case OP_CONSTANT: stack_push(READ_CONSTANT());                 break;
-    case OP_LESS:     BINARY_OP(BOOL_VAL, <);                break;
-    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);                break;
-    case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *);              break;
-    case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -);              break;
-    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, / );             break;
+    case OP_LESS:     BINARY_OP(BOOL_VAL, <);                      break;
+    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);                      break;
+    case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *);                    break;
+    case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -);                    break;
+    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, / );                   break;
     case OP_NOT:      stack_push(BOOL_VAL(is_false(stack_pop()))); break;
+    case OP_POP:      stack_pop();                                 break;
+    case OP_PRINT:    value_print(stack_pop()); putchar(10);       break;
+    case OP_SET_GLOBAL: {
+      ObjectString *name = READ_STRING();
+      if (table_set(&vm.globals, name, stack_peek(0))) {
+        table_del(&vm.globals, name);
+        runtime_error("Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }                                                            break;
+    }
+    case OP_GET_GLOBAL: {
+      ObjectString *name = READ_STRING();
+      Value value;
+      if (!table_get(&vm.globals, name, &value)) {
+        runtime_error("Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      } stack_push(value);                                         break;
+    }
+    case OP_DEFINE_GLOBAL: {
+      ObjectString *name = READ_STRING();
+      table_set(&vm.globals, name, stack_peek(0));
+      stack_pop();                                                 break;
+    }
     case OP_ADD:
       if (IS_STRING(stack_peek(0)) && IS_STRING(stack_peek(1)))
         concatenate_string();
@@ -149,23 +175,19 @@ InterpretResult run() {
       } else {
         runtime_error("Operands must be two numbers or two strings.");
         return INTERPRET_RUNTIME_ERROR;
-      } break;
+      }                                                            break;
     case OP_EQUAL:
       Value b = stack_pop();
       Value a = stack_pop();
-      stack_push(BOOL_VAL(values_equal(a, b)));
-      break;
-    case OP_RETURN:
-      value_print(stack_pop()); printf("\n");
-      return INTERPRET_OKAY;
+      stack_push(BOOL_VAL(values_equal(a, b)));                    break;
     case OP_NEGATE:
       if (!IS_NUMBER(stack_peek(0))) {
         runtime_error("Operand must be a number.");
         return INTERPRET_RUNTIME_ERROR;
-      }
-      stack_push(NUMBER_VAL(-AS_NUMBER(stack_pop())));break;
+      } stack_push(NUMBER_VAL(-AS_NUMBER(stack_pop())));           break;
     }
   }
+  return INTERPRET_OKAY;
 }
 
 InterpretResult
@@ -241,6 +263,7 @@ void new_object(Object *object) {
 }
 
 void vm_init() {
+  table_init(&vm.globals);
   table_init(&vm.strings);
   vm.objects = NULL;
   reset_stack();
@@ -251,6 +274,7 @@ void vm_intern_string(ObjectString *string) {
 }
 
 void vm_delete() {
+  table_delete(&vm.globals);
   table_delete(&vm.strings);
   objects_delete(vm.objects);
 }
@@ -259,6 +283,7 @@ void vm_delete() {
 #undef READ_BYTE
 #undef STACK_MAX
 #undef BINARY_OP
+#undef READ_STRING
 
 CLOX_END_DECLS
 

@@ -8,6 +8,9 @@
 CLOX_BEG_DECLS
 
 typedef enum {
+  OP_DEFINE_GLOBAL,
+  OP_GET_GLOBAL,
+  OP_SET_GLOBAL,
   OP_CONSTANT,
   OP_SUBTRACT,
   OP_MULTIPLY,
@@ -17,11 +20,13 @@ typedef enum {
   OP_NEGATE,
   OP_FALSE,
   OP_EQUAL,
+  OP_PRINT,
   OP_TRUE,
   OP_LESS,
   OP_NIL,
   OP_ADD,
   OP_NOT,
+  OP_POP
 } OpCode; // Instruction Bytes
 
 #define INSTCS(inst) case OP##inst: return #inst + 1
@@ -38,6 +43,7 @@ const char *inst_print(uint8_t byte) {
   INSTCS(_NEGATE);
   INSTCS(_FALSE);
   INSTCS(_EQUAL);
+  INSTCS(_PRINT);
   INSTCS(_TRUE);
   INSTCS(_LESS);
   INSTCS(_NIL);
