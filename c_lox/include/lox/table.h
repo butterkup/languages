@@ -18,9 +18,12 @@ typedef struct {
 } Table;
 
 #include "object.h"
+void table_print(Table *);
 
 void table_init(Table *table) {
-  *table = (Table){ 0, 0, NULL };
+  table->entries = NULL;
+  table->capacity = 0;
+  table->count = 0;
 }
 
 void table_delete(Table *table) {

@@ -185,8 +185,10 @@ Token consume_tk_comment() {
   case '*':
     if (!_consume_multiline_comment())
       return error_token("Unterminated multiline comment.");
-  default: return scan();
+    else break;
+  default: return error_token("Expected a comment then a token.");
   }
+  return scan();
 }
 
 Token scan() {

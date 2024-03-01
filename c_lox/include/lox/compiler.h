@@ -37,6 +37,27 @@ typedef struct {
   bool panic_mode; // Helps in resynchronizing after an error
 } Parser;
 
+typedef struct {
+  Token name;
+  int depth;
+} Local;
+
+typedef struct {
+  Local locals[UINT8_COUNT];
+  int local_count;
+  int scope_depth;
+} Compiler;
+
+Parser parser;
+Compiler *current = NULL;
+Chunk *active_chunk = NULL;
+
+void comp_init(Compiler *comp) {
+  comp->local_count = 0;
+  comp->scope_depth = 0;
+  current = comp;
+}
+
 void literal(bool);
 void expr_unary(bool);
 void expression();
@@ -51,6 +72,7 @@ void compiler_advance();
 bool compiler_match(TokenType);
 bool compiler_check(TokenType);
 uint8_t identifier_constant(Token *);
+bool identifier_equal(Token *, Token *);
 void compiler_consume(TokenType, const char *);
 
 #define TKPREC_RULE(tktp, prefix, infix, precedence) [TOKEN##tktp] = { prefix, infix, PREC##precedence }
@@ -105,9 +127,6 @@ ParserRule *get_rule(TokenType tktype) {
 }
 
 void parse_precedence(Precedence);
-
-Parser parser;
-Chunk *active_chunk;
 
 void _error_at(Token *token, const char *message) {
   if (parser.panic_mode) return;
@@ -213,12 +232,31 @@ void expr_string(bool) {
   emit_constant(OBJECT_VAL(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
+int resolve_local(Compiler *compiler, Token *name) {
+  bool unintialized = false;
+  for (int i = compiler->local_count - 1; i >= 0; --i)
+    if (identifier_equal(name, &(compiler->locals + i)->name))
+      if ((compiler->locals + i)->depth == -1) unintialized = true;
+      else return i;
+#ifndef CLOX_VAR_NO_SELF_INIT
+  if (unintialized) error("Variable used in its own initializer.");
+#endif
+  return -1;
+}
+
 void named_variable(Token name, bool can_assign) {
-  uint8_t arg = identifier_constant(&name);
+  int arg = resolve_local(current, &name);
+  uint8_t set_op = OP_SET_LOCAL, get_op = OP_GET_LOCAL;
+  if (arg == -1) {
+    arg = identifier_constant(&name);
+    set_op = OP_SET_GLOBAL;
+    get_op = OP_GET_GLOBAL;
+  }
   if (can_assign && compiler_match(TOKEN_EQUAL)) {
     expression();
-    emit_bytes(OP_SET_GLOBAL, arg);
-  } else emit_bytes(OP_GET_GLOBAL, arg);
+    emit_bytes(set_op, (uint8_t)arg);
+  }
+  else emit_bytes(get_op, (uint8_t)arg);
 }
 
 void expr_variable(bool can_assign) {
@@ -277,17 +315,53 @@ uint8_t identifier_constant(Token *token) {
   return make_constant(OBJECT_VAL(copy_string(token->start, token->length)));
 }
 
+void add_local(Token name) {
+  if (current->local_count == UINT8_COUNT) {
+    error("Too many local variables in scope.");
+    return;
+  }
+  Local *local = current->locals + (current->local_count++);
+  local->depth = -1;
+  local->name = name;
+}
+
+bool identifier_equal(Token *id1, Token *id2) {
+  if (id1->length != id2->length) return false;
+  return !memcmp(id1->start, id2->start, id1->length);
+}
+
+void declare_variable() {
+  if (current->scope_depth == 0) return;
+  Token *name = &parser.previous;
+  Local *local;
+  for (int i = current->local_count - 1; i >= 0; --i) {
+    local = current->locals + i;
+    if (local->depth != -1 && local->depth < current->scope_depth) break;
+    if (identifier_equal(name, &local->name))
+      error("Local variable already exists in the current scope.");
+  }
+  add_local(*name);
+}
+
 uint8_t parse_variable(const char *error_message) {
   compiler_consume(TOKEN_IDENTIFIER, error_message);
+  declare_variable();
+  if (current->scope_depth > 0) return 0;
   return identifier_constant(&parser.previous);
 }
 
+void mark_initialized() {
+  current->locals[current->local_count - 1].depth = current->scope_depth;
+}
+
 void define_variable(uint8_t global) {
-  emit_bytes(OP_DEFINE_GLOBAL, global);
+  if (current->scope_depth > 0) mark_initialized();
+  else emit_bytes(OP_DEFINE_GLOBAL, global);
 }
 
 void consume_eos() {
-  compiler_consume(TOKEN_SEMICOLON, "Expected ';' at the end of a statement.");
+  compiler_consume(TOKEN_SEMICOLON,
+    "Expected ';' at the end of a statement.");
 }
 
 bool compiler_match(TokenType type) {
@@ -310,8 +384,37 @@ void stmt_print() {
   emit_byte(OP_PRINT);
 }
 
+void stmt_block() {
+  while (!compiler_check(TOKEN_RIGHT_BRACE) && !compiler_check(TOKEN_EOF))
+    stmt_declaration();
+  compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+void scope_begin() {
+  ++current->scope_depth;
+}
+
+void scope_end() {
+  Local *local;
+  while (current->local_count > 0) {
+    local = current->locals + current->local_count - 1;
+    if (local->depth != current->scope_depth) break;
+    --current->local_count;
+    emit_byte(OP_POP);
+  }
+  --current->scope_depth;
+}
+
+void stmt_scoped_block() {
+  scope_begin();
+  stmt_block();
+  scope_end();
+}
+
 void stmt_statement() {
   if (compiler_match(TOKEN_PRINT)) stmt_print();
+  else if (compiler_match(TOKEN_LEFT_BRACE))
+    stmt_scoped_block();
   else stmt_expression();
 }
 
@@ -342,7 +445,9 @@ void compiler_delete() {
 }
 
 bool compile(const char *source, Chunk *chunk) {
+  Compiler compiler;
   compiler_init(chunk);
+  comp_init(&compiler);
   scanner_init(source);
   compiler_advance();
   while (!compiler_match(TOKEN_EOF))

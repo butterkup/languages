@@ -7,6 +7,7 @@
 CLOX_BEG_DECLS
 
 int constant_instruction(const char *, Chunk *, int);
+int byte_instruction(const char *, Chunk *, int);
 void disassemble_chunk(Chunk *, const char *);
 int disassemble_instruction(Chunk *, int);
 int simple_instruction(const char *, int);
@@ -40,24 +41,32 @@ int disassemble_instruction(Chunk *chunk, int offset) {
   case OP_GREATER:       return simple_instruction("OP_GREATER", offset);
   case OP_MULTIPLY:      return simple_instruction("OP_MULTIPLY", offset);
   case OP_SUBTRACT:      return simple_instruction("OP_SUBTRACT", offset);
+  case OP_SET_LOCAL:     return byte_instruction("OP_SET_LOCAL", chunk, offset);
+  case OP_GET_LOCAL:     return byte_instruction("OP_GET_LOCAL", chunk, offset);
   case OP_CONSTANT:      return constant_instruction("OP_CONSTANT", chunk, offset);
-  case OP_DEFINE_GLOBAL:    return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
-  case OP_GET_GLOBAL:    return constant_instruction("OP_GET_GLOBAL", chunk, offset);
   case OP_SET_GLOBAL:    return constant_instruction("OP_SET_GLOBAL", chunk, offset);
+  case OP_GET_GLOBAL:    return constant_instruction("OP_GET_GLOBAL", chunk, offset);
+  case OP_DEFINE_GLOBAL: return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
   default: printf("Unknown Instruction: %d\n", instruction);       return offset + 1;
   }
 }
 
 int simple_instruction(const char *name, int offset) {
-  printf("%s\n", name); return offset + 1;
+  printf("%s\n", name); return ++offset;
 }
 
 int constant_instruction(const char *name, Chunk *chunk, int offset) {
-  uint8_t constant = chunk->code[offset + 1];
+  uint8_t constant = chunk->code[++offset];
   printf("%-16s %4d  '", name, constant);
   value_print(chunk->constants.values[constant]);
   printf("'\n");
-  return offset + 2;
+  return ++offset;
+}
+
+int byte_instruction(const char *name, Chunk *chunk, int offset) {
+  uint8_t slot = chunk->code[++offset];
+  printf("%-16s %4d\n", name, slot);
+  return ++offset;
 }
 
 CLOX_END_DECLS

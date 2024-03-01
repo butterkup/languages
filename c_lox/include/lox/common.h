@@ -27,6 +27,8 @@
 # endif
 #endif
 
+#define UINT8_COUNT (UINT8_MAX + 1)
+// #defin CLOX_VAR_NO_SELF_INIT
 // #define CLOX_STACK_TRACE
 // #define CLOX_INST_TRACE
 // #define CLOX_SCAN_TRACE

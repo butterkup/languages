@@ -75,7 +75,7 @@ void runtime_error(const char *format, ...) {
   fputc('\n', stderr);
   size_t instruction = vm.ip - vm.chunk->code - 1;
   int line = vm.chunk->lines[instruction];
-  fprintf(stderr, "[line %d] in script\n", line);
+  fprintf(stderr, "[line %d] in script.\n", line);
   reset_stack();
 }
 
@@ -144,11 +144,13 @@ InterpretResult run() {
     case OP_NOT:      stack_push(BOOL_VAL(is_false(stack_pop()))); break;
     case OP_POP:      stack_pop();                                 break;
     case OP_PRINT:    value_print(stack_pop()); putchar(10);       break;
+    case OP_SET_LOCAL: vm.stack[READ_BYTE()] = stack_peek(0);      break;
+    case OP_GET_LOCAL: stack_push(vm.stack[READ_BYTE()]);          break;
     case OP_SET_GLOBAL: {
       ObjectString *name = READ_STRING();
       if (table_set(&vm.globals, name, stack_peek(0))) {
         table_del(&vm.globals, name);
-        runtime_error("Undefined variable '%s'.", name->chars);
+        runtime_error("[Setter] Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }                                                            break;
     }
@@ -156,7 +158,7 @@ InterpretResult run() {
       ObjectString *name = READ_STRING();
       Value value;
       if (!table_get(&vm.globals, name, &value)) {
-        runtime_error("Undefined variable '%s'.", name->chars);
+        runtime_error("[Getter] Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       } stack_push(value);                                         break;
     }
@@ -176,10 +178,11 @@ InterpretResult run() {
         runtime_error("Operands must be two numbers or two strings.");
         return INTERPRET_RUNTIME_ERROR;
       }                                                            break;
-    case OP_EQUAL:
+    case OP_EQUAL: {
       Value b = stack_pop();
       Value a = stack_pop();
       stack_push(BOOL_VAL(values_equal(a, b)));                    break;
+    }
     case OP_NEGATE:
       if (!IS_NUMBER(stack_peek(0))) {
         runtime_error("Operand must be a number.");
