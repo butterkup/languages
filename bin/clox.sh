@@ -5,9 +5,11 @@ declare -A CLOX_ACTIVE_DEFS
 
 CLOX_DEFS["iself"]=CLOX_VAR_NO_SELF_INIT
 CLOX_DEFS["stack"]=CLOX_STACK_TRACE
+CLOX_DEFS["ainst"]=CLOX_AINST_TRACE
 CLOX_DEFS["scan"]=CLOX_SCAN_TRACE
 CLOX_DEFS["inst"]=CLOX_INST_TRACE
 CLOX_DEFS["odel"]=CLOX_ODEL_TRACE
+CLOX_DEFS["drun"]=CLOX_DRY_RUN
 
 function _clox_valid_macro() {
   [ -z "$1" ] && return 1
@@ -28,7 +30,12 @@ function _clox_export_defs() {
 }
 
 function _clox_usage_macro() {
-  echo "Unexpected macro '$1', valid macros are: ${!CLOX_DEFS[@]}"
+  echo "Unexpected macro '$1', valid macros are:"
+  local i=1
+  for macro in "${!CLOX_DEFS[@]}"; do
+    echo "$i: $macro"
+    i=$(($i + 1))
+  done
 }
 
 function _clox_define() {

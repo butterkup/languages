@@ -24,6 +24,8 @@ CLOX_BEG_DECLS
     double a = AS_NUMBER(stack_pop());                               \
     stack_push(Type(a op b));                                        \
   } while(false)
+#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+#define BOOL_COND() is_false(stack_peek(0))
 
 typedef struct {
   Chunk *chunk;
@@ -80,7 +82,10 @@ void runtime_error(const char *format, ...) {
 }
 
 bool is_false(Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+  return IS_NIL(value) ||
+    ((IS_NUMBER(value)) && AS_NUMBER(value) == 0) ||
+    ((IS_STRING(value)) && (AS_STRING(value))->length == 0) ||
+    ((IS_BOOL(value)) && AS_BOOL(value) == false);
 }
 
 bool values_equal(Value a, Value b) {
@@ -116,6 +121,10 @@ void concatenate_string() {
 }
 
 InterpretResult run() {
+#ifdef CLOX_AINST_TRACE
+  disassemble_chunk(vm.chunk, "All Instructions");
+#endif // CLOX_AINST_TRACE
+#ifndef CLOX_DRY_RUN
   uint8_t instruction;
   for (;;) {
 #ifdef CLOX_STACK_TRACE
@@ -146,6 +155,9 @@ InterpretResult run() {
     case OP_PRINT:    value_print(stack_pop()); putchar(10);       break;
     case OP_SET_LOCAL: vm.stack[READ_BYTE()] = stack_peek(0);      break;
     case OP_GET_LOCAL: stack_push(vm.stack[READ_BYTE()]);          break;
+    case OP_JUMP_IF_FALSE: vm.ip += BOOL_COND() * READ_SHORT();    break;
+    case OP_JUMP:          vm.ip += READ_SHORT();                  break;
+    case OP_LOOP:          vm.ip -= READ_SHORT();                  break;
     case OP_SET_GLOBAL: {
       ObjectString *name = READ_STRING();
       if (table_set(&vm.globals, name, stack_peek(0))) {
@@ -190,6 +202,7 @@ InterpretResult run() {
       } stack_push(NUMBER_VAL(-AS_NUMBER(stack_pop())));           break;
     }
   }
+#endif // CLOX_DRY_RUN
   return INTERPRET_OKAY;
 }
 
@@ -287,6 +300,8 @@ void vm_delete() {
 #undef STACK_MAX
 #undef BINARY_OP
 #undef READ_STRING
+#undef READ_SHORT
+#undef BOOL_COND
 
 CLOX_END_DECLS
 

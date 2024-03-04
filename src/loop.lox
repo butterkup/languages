@@ -1,0 +1,16 @@
+var count = 20;
+
+while (count) {
+  print count;
+  count = count - 2;
+}
+
+for (count = 100; count; count = count - 10)
+  print count * count;
+
+for (var x = 100; x > 50; x = x - 1)
+  for (var y = 100; y > 50; y = y - 1)
+    if (x == y) print x * y;
+    else print x + y;
+
+print "Hello There";

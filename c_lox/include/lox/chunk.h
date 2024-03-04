@@ -8,6 +8,7 @@
 CLOX_BEG_DECLS
 
 typedef enum {
+  OP_JUMP_IF_FALSE,
   OP_DEFINE_GLOBAL,
   OP_GET_GLOBAL,
   OP_SET_GLOBAL,
@@ -25,6 +26,8 @@ typedef enum {
   OP_PRINT,
   OP_TRUE,
   OP_LESS,
+  OP_JUMP,
+  OP_LOOP,
   OP_NIL,
   OP_ADD,
   OP_NOT,
@@ -36,6 +39,12 @@ typedef enum {
 const char *inst_print(uint8_t byte) {
   switch (byte)
   {
+  INSTCS(_JUMP_IF_FALSE);
+  INSTCS(_DEFINE_GLOBAL);
+  INSTCS(_GET_GLOBAL);
+  INSTCS(_SET_GLOBAL);
+  INSTCS(_GET_LOCAL);
+  INSTCS(_SET_LOCAL);
   INSTCS(_CONSTANT);
   INSTCS(_SUBTRACT);
   INSTCS(_MULTIPLY);
@@ -48,9 +57,12 @@ const char *inst_print(uint8_t byte) {
   INSTCS(_PRINT);
   INSTCS(_TRUE);
   INSTCS(_LESS);
+  INSTCS(_JUMP);
+  INSTCS(_LOOP);
   INSTCS(_NIL);
   INSTCS(_ADD);
   INSTCS(_NOT);
+  INSTCS(_POP);
   }
   return "<UNKOWN_INST>";
 }

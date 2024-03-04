@@ -1,0 +1,29 @@
+var CHEATED = false;
+var EXAM_SCORE = 90;
+var EXAM_GRADE = "90";
+
+print "Grade Scores App";
+print "Score: " + EXAM_GRADE;
+
+if (CHEATED)               EXAM_GRADE = "<Cheater>";
+else if (EXAM_SCORE > 100) EXAM_GRADE = "<BigScore>";
+else if (EXAM_SCORE >= 70) EXAM_GRADE = "A";
+else if (EXAM_SCORE >= 60) EXAM_GRADE = "B";
+else if (EXAM_SCORE >= 50) EXAM_GRADE = "C";
+else if (EXAM_SCORE >= 40) EXAM_GRADE = "D";
+else if (EXAM_SCORE >= 0)  EXAM_GRADE = "E";
+else                       EXAM_GRADE = "<NegScore>";
+
+print "Grade: " + EXAM_GRADE;
+
+/*
+var voter_age = 15;
+print "Start";
+if (voter_age >= 18) {
+  print "You can Vote!!!";
+}
+else {
+  print "You are too young to Vote.";
+}
+print "Done";
+*/

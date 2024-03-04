@@ -58,17 +58,24 @@ void comp_init(Compiler *comp) {
   current = comp;
 }
 
+void stmt_var();
+void expr_or(bool);
 void literal(bool);
-void expr_unary(bool);
 void expression();
+void expr_and(bool);
+void patch_jump(int);
+void compiler_sync();
+void expr_unary(bool);
+void stmt_statement();
+int emit_jump(OpCode);
 void expr_binary(bool);
 void expr_number(bool);
 void expr_string(bool);
-void expr_grouping(bool);
-void expr_variable(bool);
-void compiler_sync();
+void emit_byte(uint8_t);
 void stmt_declaration();
 void compiler_advance();
+void expr_grouping(bool);
+void expr_variable(bool);
 bool compiler_match(TokenType);
 bool compiler_check(TokenType);
 uint8_t identifier_constant(Token *);
@@ -100,7 +107,7 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_IDENTIFIER,     expr_variable,  NULL,         _NONE),
   TKPREC_RULE(_STRING,         expr_string,    NULL,         _NONE),
   TKPREC_RULE(_NUMBER,         expr_number,    NULL,         _NONE),
-  TKPREC_RULE(_AND,            NULL,           NULL,         _NONE),
+  TKPREC_RULE(_AND,            NULL,           expr_and,     _AND),
   TKPREC_RULE(_CLASS,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_ELSE,           NULL,           NULL,         _NONE),
   TKPREC_RULE(_FALSE,          literal,        NULL,         _NONE),
@@ -108,7 +115,7 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_FUN,            NULL,           NULL,         _NONE),
   TKPREC_RULE(_IF,             NULL,           NULL,         _NONE),
   TKPREC_RULE(_NIL,            literal,        NULL,         _NONE),
-  TKPREC_RULE(_OR,             NULL,           NULL,         _NONE),
+  TKPREC_RULE(_OR,             NULL,           expr_or,      _OR),
   TKPREC_RULE(_PRINT,          NULL,           NULL,         _NONE),
   TKPREC_RULE(_RETURN,         NULL,           NULL,         _NONE),
   TKPREC_RULE(_SUPER,          NULL,           NULL,         _NONE),
@@ -149,6 +156,22 @@ void error_at(const char *message) {
   _error_at(&parser.current, message);
 }
 
+void expr_and(bool) {
+  int jump_end = emit_jump(OP_JUMP_IF_FALSE);
+  emit_byte(OP_POP);
+  parse_precedence(PREC_AND);
+  patch_jump(jump_end);
+}
+
+void expr_or(bool) {
+  int jump_else = emit_jump(OP_JUMP_IF_FALSE),
+      jump_end = emit_jump(OP_JUMP);
+  patch_jump(jump_else);
+  emit_byte(OP_POP);
+  parse_precedence(PREC_OR);
+  patch_jump(jump_end);
+}
+
 void compiler_sync() {
   parser.panic_mode = false;
   while (!compiler_check(TOKEN_EOF)) {
@@ -185,8 +208,7 @@ bool compiler_check(TokenType type) {
 }
 
 void compiler_consume(TokenType type, const char *message) {
-  if (compiler_check(type))
-    compiler_advance();
+  if (compiler_check(type)) compiler_advance();
   else error_at(message);
 }
 
@@ -220,6 +242,12 @@ void literal(bool) {
   case TOKEN_NIL: emit_byte(OP_NIL);     break;
   case TOKEN_TRUE: emit_byte(OP_TRUE);   break;
   case TOKEN_FALSE: emit_byte(OP_FALSE); break;
+  default: printf("Unknown literal type[%d]: %s -> '%.*s'\n",
+    parser.previous.type,
+    strtokentype(parser.previous.type),
+    parser.previous.length,
+    parser.previous.start
+  ); exit(1); 
   }
 }
 
@@ -283,7 +311,9 @@ void expr_binary(bool) {
   case TOKEN_GREATER_EQUAL: emit_bytes(OP_LESS, OP_NOT);    break;
   case TOKEN_BANG_EQUAL:    emit_bytes(OP_EQUAL, OP_NOT);   break;
   case TOKEN_LESS_EQUAL:    emit_bytes(OP_GREATER, OP_NOT); break;
-  default: printf("Unrecognized expr binary token type: %d\n", optype); exit(1);
+  default:
+    printf("Unrecognized expr binary token type[%d]: '%s'\n", optype, inst_print(optype));
+    exit(1);
   }
 }
 
@@ -293,7 +323,9 @@ void expr_unary(bool) {
   switch (optype) {
   case TOKEN_BANG: emit_byte(OP_NOT);     break;
   case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
-  default: printf("Unrecognized expr unary token type: %d\n", optype); exit(1);
+  default:
+    printf("Unrecognized expr unary token type[%d]: '%s'\n", optype, inst_print(optype));
+    exit(1);
   }
 }
 
@@ -390,9 +422,7 @@ void stmt_block() {
   compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
-void scope_begin() {
-  ++current->scope_depth;
-}
+void scope_begin() { ++current->scope_depth; }
 
 void scope_end() {
   Local *local;
@@ -405,17 +435,100 @@ void scope_end() {
   --current->scope_depth;
 }
 
-void stmt_scoped_block() {
+void stmt_sblock() {
   scope_begin();
   stmt_block();
   scope_end();
 }
 
-void stmt_statement() {
-  if (compiler_match(TOKEN_PRINT)) stmt_print();
-  else if (compiler_match(TOKEN_LEFT_BRACE))
-    stmt_scoped_block();
+int emit_jump(OpCode jtype) {
+  emit_byte(jtype);
+  emit_bytes(0xff, 0xff);
+  return current_chunk()->count - 2;
+}
+
+void emit_loop(int loop_start) {
+  emit_byte(OP_LOOP);
+  int offset = current_chunk()->count - loop_start + 2;
+  if (offset > UINT16_MAX) error("Loop Body too large.");
+  emit_byte((offset >> 8) & 0xff);
+  emit_byte(offset & 0xff);
+}
+
+void patch_jump(int offset) {
+  int jump = current_chunk()->count - offset - 2;
+  if (jump > UINT16_MAX) error("Too much code to jump over.");
+  current_chunk()->code[offset] = (jump >> 8) & 0xff;
+  current_chunk()->code[++offset] = jump & 0xff;
+}
+
+void stmt_if() {
+  compiler_consume(TOKEN_LEFT_PAREN, "Expect '(' after keyword 'if'");
+  expression();
+  compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after if-condition.");
+  int jump_then = emit_jump(OP_JUMP_IF_FALSE);
+  emit_byte(OP_POP);
+  stmt_statement();
+  int jump_else = emit_jump(OP_JUMP);
+  patch_jump(jump_then);
+  emit_byte(OP_POP);
+  if (compiler_match(TOKEN_ELSE)) stmt_statement();
+  patch_jump(jump_else);
+}
+
+void stmt_while() {
+  int loop_start = current_chunk()->count;
+  compiler_consume(TOKEN_LEFT_PAREN, "Expect '(' after keyword while.");
+  expression();
+  compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after while-condition.");
+  int jump_exit = emit_jump(OP_JUMP_IF_FALSE);
+  emit_byte(OP_POP);
+  stmt_statement();
+  emit_loop(loop_start);
+  patch_jump(jump_exit);
+  emit_byte(OP_POP);
+}
+
+void stmt_for() {
+  scope_begin();
+  compiler_consume(TOKEN_LEFT_PAREN, "Expect '(' after keyword for.");
+  if (compiler_match(TOKEN_SEMICOLON));
+  else if (compiler_match(TOKEN_VAR)) stmt_var();
   else stmt_expression();
+  int loop_start = current_chunk()->count;
+  int jump_exit = -1;
+  if (!compiler_match(TOKEN_SEMICOLON)) {
+    expression();
+    compiler_consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+    jump_exit = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+  }
+  if (!compiler_match(TOKEN_RIGHT_PAREN)) {
+    int jump_body = emit_jump(OP_JUMP);
+    int start_increment = current_chunk()->count;
+    expression();
+    emit_byte(OP_POP);
+    compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after for-clauses.");
+    emit_loop(loop_start);
+    loop_start = start_increment;
+    patch_jump(jump_body);
+  }
+  stmt_statement();
+  emit_loop(loop_start);
+  if (jump_exit != -1) {
+    patch_jump(jump_exit);
+    emit_byte(OP_POP);
+  }
+  scope_end();
+}
+
+void stmt_statement() {
+  if (compiler_match(TOKEN_IF))              stmt_if();
+  else if (compiler_match(TOKEN_FOR))        stmt_for();
+  else if (compiler_match(TOKEN_PRINT))      stmt_print();
+  else if (compiler_match(TOKEN_WHILE))      stmt_while();
+  else if (compiler_match(TOKEN_LEFT_BRACE)) stmt_sblock();
+  else                                       stmt_expression();
 }
 
 void stmt_var() {
