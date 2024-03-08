@@ -28,6 +28,7 @@ typedef enum {
   OP_LESS,
   OP_JUMP,
   OP_LOOP,
+  OP_CALL,
   OP_NIL,
   OP_ADD,
   OP_NOT,
@@ -59,6 +60,7 @@ const char *inst_print(uint8_t byte) {
   INSTCS(_LESS);
   INSTCS(_JUMP);
   INSTCS(_LOOP);
+  INSTCS(_CALL);
   INSTCS(_NIL);
   INSTCS(_ADD);
   INSTCS(_NOT);

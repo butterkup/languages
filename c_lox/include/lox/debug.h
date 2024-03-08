@@ -42,6 +42,7 @@ int disassemble_instruction(Chunk *chunk, int offset) {
   case OP_GREATER:       return simple_instruction(chunk, offset);
   case OP_MULTIPLY:      return simple_instruction(chunk, offset);
   case OP_SUBTRACT:      return simple_instruction(chunk, offset);
+  case OP_CALL:          return byte_instruction(chunk, offset);
   case OP_SET_LOCAL:     return byte_instruction(chunk, offset);
   case OP_GET_LOCAL:     return byte_instruction(chunk, offset);
   case OP_JUMP:          return jump_instruction(chunk, 1, offset);

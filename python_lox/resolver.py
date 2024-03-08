@@ -218,7 +218,7 @@ class Resolver(ExprVisitor, StmtVisitor):
     def visit_grouping(self, expr: east.Grouping):
         self._resolve(expr.expression)
 
-    def visit_literal(self, _: east.Literal):
+    def visit_literal(self, expr: east.Literal):
         ...
 
     def visit_ternary(self, expr: east.Ternary):

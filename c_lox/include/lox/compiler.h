@@ -42,20 +42,40 @@ typedef struct {
   int depth;
 } Local;
 
-typedef struct {
+typedef enum {
+  TYPE_FUNCTION,
+  TYPE_SCRIPT
+} FunctionType;
+
+typedef struct Compiler Compiler;
+
+struct Compiler {
+  Compiler *enclosing;
+  ObjectFunction *function;
+  FunctionType type;
   Local locals[UINT8_COUNT];
   int local_count;
   int scope_depth;
-} Compiler;
+};
 
 Parser parser;
 Compiler *current = NULL;
-Chunk *active_chunk = NULL;
 
-void comp_init(Compiler *comp) {
+void comp_init(Compiler *comp, FunctionType type) {
+  comp->function = new_function();
   comp->local_count = 0;
   comp->scope_depth = 0;
+  comp->type = type;
+  comp->enclosing = current;
   current = comp;
+  if (type != TYPE_SCRIPT)
+    current->function->name = copy_string(
+      parser.previous.start, parser.previous.length
+    );
+  Local *local = &current->locals[current->local_count++];
+  local->depth = 0;
+  local->name.start = "";
+  local->name.length = 0;
 }
 
 void stmt_var();
@@ -76,7 +96,9 @@ void stmt_declaration();
 void compiler_advance();
 void expr_grouping(bool);
 void expr_variable(bool);
+void expr_call(bool);
 bool compiler_match(TokenType);
+ObjectFunction *compiler_delete();
 bool compiler_check(TokenType);
 uint8_t identifier_constant(Token *);
 bool identifier_equal(Token *, Token *);
@@ -85,7 +107,7 @@ void compiler_consume(TokenType, const char *);
 #define TKPREC_RULE(tktp, prefix, infix, precedence) [TOKEN##tktp] = { prefix, infix, PREC##precedence }
 
 ParserRule tkprec_rules[] = {
-  TKPREC_RULE(_LEFT_PAREN,     expr_grouping,  NULL,         _NONE),
+  TKPREC_RULE(_LEFT_PAREN,     expr_grouping,  expr_call,    _CALL),
   TKPREC_RULE(_RIGHT_PAREN,    NULL,           NULL,         _NONE),
   TKPREC_RULE(_LEFT_BRACE,     NULL,           NULL,         _NONE),
   TKPREC_RULE(_RIGHT_BRACE,    NULL,           NULL,         _NONE),
@@ -165,7 +187,7 @@ void expr_and(bool) {
 
 void expr_or(bool) {
   int jump_else = emit_jump(OP_JUMP_IF_FALSE),
-      jump_end = emit_jump(OP_JUMP);
+    jump_end = emit_jump(OP_JUMP);
   patch_jump(jump_else);
   emit_byte(OP_POP);
   parse_precedence(PREC_OR);
@@ -212,7 +234,7 @@ void compiler_consume(TokenType type, const char *message) {
   else error_at(message);
 }
 
-Chunk *current_chunk() { return active_chunk; }
+Chunk *current_chunk() { return &current->function->chunk; }
 
 void emit_byte(uint8_t byte) {
   chunk_append(current_chunk(), byte, parser.previous.line);
@@ -223,7 +245,7 @@ void emit_bytes(uint8_t b1, uint8_t b2) {
 }
 
 void emit_return() {
-  emit_byte(OP_RETURN);
+  emit_bytes(OP_NIL, OP_RETURN);
 }
 
 uint8_t make_constant(Value constant) {
@@ -247,7 +269,7 @@ void literal(bool) {
     strtokentype(parser.previous.type),
     parser.previous.length,
     parser.previous.start
-  ); exit(1); 
+  ); exit(1);
   }
 }
 
@@ -289,6 +311,21 @@ void named_variable(Token name, bool can_assign) {
 
 void expr_variable(bool can_assign) {
   named_variable(parser.previous, can_assign);
+}
+
+uint8_t argument_list() {
+  uint8_t arg_count = 0;
+  if (!compiler_check(TOKEN_RIGHT_PAREN)) do {
+    expression(); if (arg_count++ == 255)
+      error("Can't have more than 255 arguments.");
+  } while (compiler_match(TOKEN_COMMA));
+  compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+  return arg_count;
+}
+
+void expr_call(bool can_assign) {
+  uint8_t arg_count = argument_list();
+  emit_bytes(OP_CALL, arg_count);
 }
 
 void expr_grouping(bool) {
@@ -383,6 +420,7 @@ uint8_t parse_variable(const char *error_message) {
 }
 
 void mark_initialized() {
+  if (current->scope_depth == 0) return;
   current->locals[current->local_count - 1].depth = current->scope_depth;
 }
 
@@ -522,11 +560,23 @@ void stmt_for() {
   scope_end();
 }
 
+void stmt_return() {
+  if (current->type == TYPE_SCRIPT)
+    error("Can't return from top level code.");
+  if (compiler_match(TOKEN_SEMICOLON)) emit_return();
+  else {
+    expression();
+    consume_eos();
+    emit_byte(OP_RETURN);
+  }
+}
+
 void stmt_statement() {
   if (compiler_match(TOKEN_IF))              stmt_if();
   else if (compiler_match(TOKEN_FOR))        stmt_for();
   else if (compiler_match(TOKEN_PRINT))      stmt_print();
   else if (compiler_match(TOKEN_WHILE))      stmt_while();
+  else if (compiler_match(TOKEN_RETURN))     stmt_return();
   else if (compiler_match(TOKEN_LEFT_BRACE)) stmt_sblock();
   else                                       stmt_expression();
 }
@@ -539,35 +589,68 @@ void stmt_var() {
   define_variable(global);
 }
 
+void consume_function(FunctionType type) {
+  Compiler compiler;
+  comp_init(&compiler, type);
+  scope_begin();
+
+  compiler_consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+  if (!compiler_check(TOKEN_RIGHT_PAREN)) {
+    do {
+      current->function->arity++;
+      if (current->function->arity > 255)
+        error_at("Can't have more than 255 parameters.");
+      uint8_t param = parse_variable("Expect parameter name.");
+      define_variable(param);
+    } while (compiler_match(TOKEN_COMMA));
+  }
+  compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+  compiler_consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+  stmt_block();
+  scope_end();
+
+  ObjectFunction *function = compiler_delete();
+  emit_bytes(OP_CONSTANT, make_constant(OBJECT_VAL(function)));
+}
+
+void stmt_fun() {
+  uint8_t global = parse_variable("Expect function name");
+  mark_initialized();
+  consume_function(TYPE_FUNCTION);
+  define_variable(global);
+}
+
 void stmt_declaration() {
-  if (compiler_match(TOKEN_VAR))
-    stmt_var();
+  if (compiler_match(TOKEN_VAR)) stmt_var();
+  else if (compiler_match(TOKEN_FUN)) stmt_fun();
   else stmt_statement();
   if (parser.panic_mode)
     compiler_sync();
 }
 
-void compiler_init(Chunk *chunk) {
+void compiler_init() {
   parser.panic_mode = false;
   parser.had_error = false;
-  active_chunk = chunk;
 }
 
-void compiler_delete() {
+ObjectFunction *compiler_delete() {
   emit_return();
+  ObjectFunction *function = current->function;
+  current = current->enclosing;
+  return function;
 }
 
-bool compile(const char *source, Chunk *chunk) {
+ObjectFunction *compile(const char *source) {
   Compiler compiler;
-  compiler_init(chunk);
-  comp_init(&compiler);
+  compiler_init();
+  comp_init(&compiler, TYPE_SCRIPT);
   scanner_init(source);
   compiler_advance();
-  while (!compiler_match(TOKEN_EOF))
-    stmt_declaration();
+  while (!compiler_match(TOKEN_EOF)) stmt_declaration();
   compiler_consume(TOKEN_EOF, "Expect end of expression.");
-  compiler_delete();
-  return !parser.had_error;
+  ObjectFunction *function = compiler_delete();
+  return parser.had_error ? NULL : function;
 }
 
 CLOX_END_DECLS

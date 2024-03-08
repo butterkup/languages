@@ -1,5 +1,5 @@
 from .base import Callable, StmtVisitor
-from time import time
+from time import monotonic
 from .env import Environment
 from typing import Protocol
 
@@ -16,7 +16,7 @@ class Clock(_nativefn):
         return 0
 
     def call(self, visitor: StmtVisitor, args: list[object]):
-        return time()
+        return monotonic()
 
 
 class PrintMany(_nativefn):

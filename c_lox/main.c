@@ -12,13 +12,15 @@ vm_delete_on_sigint(int _) {
 int main(int argc, char **argv) {
   // Temporary cleanup procedure for testing
   signal(SIGINT, vm_delete_on_sigint);
+  int exit_code = 0;
   vm_init();
   if (argc == 1) repl();
   else if (argc == 2)
-    run_file(argv[1]);
+    exit_code = run_file(argv[1]);
   else {
     fputs("Usage: clox [path]\n", stderr);
-    exit(64);
+    exit_code = 64;
   }
   vm_delete();
+  return exit_code;
 }

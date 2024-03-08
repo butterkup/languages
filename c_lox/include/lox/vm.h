@@ -7,12 +7,17 @@
 #include "chunk.h"
 #include "debug.h"
 #include "value.h"
+#include "natives.h"
 
 CLOX_BEG_DECLS
 
-#define READ_BYTE() (*vm.ip++)
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-#define STACK_MAX 256
+#define TOP_FRAME() (&vm.frames[vm.frame_count - 1])
+#define CHUNK() (TOP_FRAME()->function->chunk)
+#define VMIP() (TOP_FRAME()->ip)
+#define READ_BYTE() (*VMIP()++)
+#define READ_CONSTANT() (CHUNK().constants.values[READ_BYTE()])
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(Type, op)                                          \
   do {                                                               \
@@ -24,12 +29,18 @@ CLOX_BEG_DECLS
     double a = AS_NUMBER(stack_pop());                               \
     stack_push(Type(a op b));                                        \
   } while(false)
-#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+#define READ_SHORT() (VMIP() += 2, (uint16_t)((VMIP()[-2] << 8) | VMIP()[-1]))
 #define BOOL_COND() is_false(stack_peek(0))
 
 typedef struct {
-  Chunk *chunk;
+  ObjectFunction *function;
   uint8_t *ip;
+  Value *slots;
+} CallFrame;
+
+typedef struct {
+  CallFrame frames[FRAMES_MAX];
+  int frame_count;
   Value stack[STACK_MAX];
   Value *stack_top;
   Object *objects;
@@ -74,11 +85,29 @@ void runtime_error(const char *format, ...) {
   va_start(args, format);
   vfprintf(stderr, format, args);
   va_end(args);
-  fputc('\n', stderr);
-  size_t instruction = vm.ip - vm.chunk->code - 1;
-  int line = vm.chunk->lines[instruction];
-  fprintf(stderr, "[line %d] in script.\n", line);
+  fputc(10, stderr);
+
+  CallFrame *frame;
+  size_t instruction;
+  ObjectFunction *function;
+
+  for (int i = vm.frame_count - 1; i >= 0; --i) {
+    frame = &vm.frames[i];
+    function = frame->function;
+    instruction = frame->ip - function->chunk.code - 1;
+    fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+    if (function->name == NULL) fprintf(stderr, "script\n");
+    else fprintf(stderr, "%s()\n", function->name->chars);
+  }
   reset_stack();
+}
+
+void define_native(const char *name, NativeFn function) {
+  stack_push(OBJECT_VAL(copy_string(name, (int)strlen(name))));
+  stack_push(OBJECT_VAL(new_native(function)));
+  table_set(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+  stack_pop();
+  stack_pop();
 }
 
 bool is_false(Value value) {
@@ -120,9 +149,41 @@ void concatenate_string() {
   stack_push(OBJECT_VAL(result));
 }
 
+bool call_function(ObjectFunction *function, int arg_count) {
+  if (arg_count != function->arity) {
+    runtime_error(
+      "Expected %d arguments but got %d.",
+      function->arity, arg_count
+    ); return false;
+  }
+  if (vm.frame_count == FRAMES_MAX) {
+    runtime_error("Call stack overflow.");
+    return false;
+  }
+  CallFrame *frame = &vm.frames[vm.frame_count++];
+  frame->function = function;
+  frame->ip = function->chunk.code;
+  frame->slots = vm.stack_top - arg_count - 1;
+  return true;
+}
+
+bool call_value(Value callee, int arg_count) {
+  if (IS_OBJECT(callee)) switch (OBJECT_TYPE(callee)) {
+  case OBJ_FUNCTION: return call_function(AS_FUNCTION(callee), arg_count);
+  case OBJ_NATIVE: {
+    NativeFn native = AS_NATIVE(callee);
+    Value result = native(arg_count, vm.stack_top - arg_count);
+    vm.stack_top -= arg_count;
+    stack_push(result); return true;
+  }
+  }
+  runtime_error("Can only call functions and classes.");
+  return false;
+}
+
 InterpretResult run() {
 #ifdef CLOX_AINST_TRACE
-  disassemble_chunk(vm.chunk, "All Instructions");
+  disassemble_chunk(&CHUNK(), "All Instructions");
 #endif // CLOX_AINST_TRACE
 #ifndef CLOX_DRY_RUN
   uint8_t instruction;
@@ -137,34 +198,48 @@ InterpretResult run() {
     printf("]\n");
 #endif
 #ifdef CLOX_INST_TRACE
-    disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+    disassemble_instruction(&CHUNK(), (int)(VMIP() - CHUNK().code));
 #endif
     switch (instruction = READ_BYTE()) {
-    case OP_RETURN:   return INTERPRET_OKAY;
-    case OP_NIL:      stack_push(NIL_VAL);                         break;
-    case OP_TRUE:     stack_push(BOOL_VAL(true));                  break;
-    case OP_FALSE:    stack_push(BOOL_VAL(false));                 break;
-    case OP_CONSTANT: stack_push(READ_CONSTANT());                 break;
-    case OP_LESS:     BINARY_OP(BOOL_VAL, <);                      break;
-    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);                      break;
-    case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *);                    break;
-    case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -);                    break;
-    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, / );                   break;
-    case OP_NOT:      stack_push(BOOL_VAL(is_false(stack_pop()))); break;
-    case OP_POP:      stack_pop();                                 break;
-    case OP_PRINT:    value_print(stack_pop()); putchar(10);       break;
-    case OP_SET_LOCAL: vm.stack[READ_BYTE()] = stack_peek(0);      break;
-    case OP_GET_LOCAL: stack_push(vm.stack[READ_BYTE()]);          break;
-    case OP_JUMP_IF_FALSE: vm.ip += BOOL_COND() * READ_SHORT();    break;
-    case OP_JUMP:          vm.ip += READ_SHORT();                  break;
-    case OP_LOOP:          vm.ip -= READ_SHORT();                  break;
+    case OP_RETURN: {
+      Value result = stack_pop();
+      -- vm.frame_count;
+      if (vm.frame_count == 0) {
+        stack_pop();
+        return INTERPRET_OKAY;
+      }
+      vm.stack_top = (TOP_FRAME() + 1)->slots;
+      stack_push(result);                                               break;
+    }
+    case OP_NIL:      stack_push(NIL_VAL);                              break;
+    case OP_TRUE:     stack_push(BOOL_VAL(true));                       break;
+    case OP_FALSE:    stack_push(BOOL_VAL(false));                      break;
+    case OP_CONSTANT: stack_push(READ_CONSTANT());                      break;
+    case OP_LESS:     BINARY_OP(BOOL_VAL, <);                           break;
+    case OP_GREATER:  BINARY_OP(BOOL_VAL, >);                           break;
+    case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *);                         break;
+    case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -);                         break;
+    case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /);                         break;
+    case OP_NOT:      stack_push(BOOL_VAL(is_false(stack_pop())));      break;
+    case OP_POP:      stack_pop();                                      break;
+    case OP_PRINT:    value_print(stack_pop()); putchar(10);            break;
+    case OP_SET_LOCAL: TOP_FRAME()->slots[READ_BYTE()] = stack_peek(0); break;
+    case OP_GET_LOCAL: stack_push(TOP_FRAME()->slots[READ_BYTE()]);     break;
+    case OP_JUMP_IF_FALSE: VMIP() += BOOL_COND() * READ_SHORT();        break;
+    case OP_JUMP:          VMIP() += READ_SHORT();                      break;
+    case OP_LOOP:          VMIP() -= READ_SHORT();                      break;
+    case OP_CALL: {
+      int arg_count = READ_BYTE();
+      if (!call_value(stack_peek(arg_count), arg_count))
+        return INTERPRET_RUNTIME_ERROR;                                 break;
+    }
     case OP_SET_GLOBAL: {
       ObjectString *name = READ_STRING();
       if (table_set(&vm.globals, name, stack_peek(0))) {
         table_del(&vm.globals, name);
         runtime_error("[Setter] Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
-      }                                                            break;
+      }                                                                 break;
     }
     case OP_GET_GLOBAL: {
       ObjectString *name = READ_STRING();
@@ -172,12 +247,12 @@ InterpretResult run() {
       if (!table_get(&vm.globals, name, &value)) {
         runtime_error("[Getter] Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
-      } stack_push(value);                                         break;
+      } stack_push(value);                                              break;
     }
     case OP_DEFINE_GLOBAL: {
       ObjectString *name = READ_STRING();
       table_set(&vm.globals, name, stack_peek(0));
-      stack_pop();                                                 break;
+      stack_pop();                                                      break;
     }
     case OP_ADD:
       if (IS_STRING(stack_peek(0)) && IS_STRING(stack_peek(1)))
@@ -186,20 +261,21 @@ InterpretResult run() {
         double b = AS_NUMBER(stack_pop());
         double a = AS_NUMBER(stack_pop());
         stack_push(NUMBER_VAL(a + b));
-      } else {
+      }
+      else {
         runtime_error("Operands must be two numbers or two strings.");
         return INTERPRET_RUNTIME_ERROR;
-      }                                                            break;
+      }                                                                 break;
     case OP_EQUAL: {
       Value b = stack_pop();
       Value a = stack_pop();
-      stack_push(BOOL_VAL(values_equal(a, b)));                    break;
+      stack_push(BOOL_VAL(values_equal(a, b)));                         break;
     }
     case OP_NEGATE:
       if (!IS_NUMBER(stack_peek(0))) {
         runtime_error("Operand must be a number.");
         return INTERPRET_RUNTIME_ERROR;
-      } stack_push(NUMBER_VAL(-AS_NUMBER(stack_pop())));           break;
+      } stack_push(NUMBER_VAL(-AS_NUMBER(stack_pop())));                break;
     }
   }
 #endif // CLOX_DRY_RUN
@@ -208,17 +284,11 @@ InterpretResult run() {
 
 InterpretResult
 interpret(const char *source) {
-  Chunk chunk;
-  InterpretResult result;
-  chunk_init(&chunk);
-  if (compile(source, &chunk)) {
-    vm.chunk = &chunk;
-    vm.ip = chunk.code;
-    result = run();
-  }
-  else result = INTERPRET_COMPILE_ERROR;
-  chunk_delete(&chunk);
-  return result;
+  ObjectFunction *function = compile(source);
+  if (function == NULL) return INTERPRET_COMPILE_ERROR;
+  stack_push(OBJECT_VAL(function));
+  call_value(OBJECT_VAL(function), 0);
+  return run();
 }
 
 void repl() {
@@ -257,20 +327,21 @@ char *read_file(const char *path) {
   return buffer;
 }
 
-void run_file(const char *path) {
+int run_file(const char *path) {
   char *source = read_file(path);
   InterpretResult result = interpret(source);
   free(source);
   switch (result) {
-  case INTERPRET_COMPILE_ERROR:
-    exit(65);
-  case INTERPRET_RUNTIME_ERROR:
-    exit(70);
+  case INTERPRET_COMPILE_ERROR: return 65;
+  case INTERPRET_RUNTIME_ERROR: return 70;
+  default:
+  case INTERPRET_OKAY:          return 0;
   }
 }
 
 void reset_stack() {
   vm.stack_top = vm.stack;
+  vm.frame_count = 0;
 }
 
 void new_object(Object *object) {
@@ -278,11 +349,20 @@ void new_object(Object *object) {
   vm.objects = object;
 }
 
+ObjectFunction *new_function() {
+  ObjectFunction *function = ALLOCATE_OBJECT(ObjectFunction, OBJ_FUNCTION);
+  function->arity = 0;
+  function->name = NULL;
+  chunk_init(&function->chunk);
+  return function;
+}
+
 void vm_init() {
   table_init(&vm.globals);
   table_init(&vm.strings);
   vm.objects = NULL;
   reset_stack();
+  setup_lox_native();
 }
 
 void vm_intern_string(ObjectString *string) {
@@ -302,6 +382,9 @@ void vm_delete() {
 #undef READ_STRING
 #undef READ_SHORT
 #undef BOOL_COND
+#undef VMIP
+#undef TOP_FRAME
+#undef CHUNK
 
 CLOX_END_DECLS
 

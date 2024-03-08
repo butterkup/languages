@@ -85,7 +85,7 @@ class Stmt(typing.Protocol):
 
 @typing.runtime_checkable
 class Callable(typing.Protocol):
-    def call(self, visitor: StmtVisitor, args: list[object]):
+    def call(self, visitor: StmtVisitor, args: list[object]) -> typing.Any:
         ...
 
     def arity(self) -> int:
