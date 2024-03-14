@@ -21,7 +21,7 @@ typedef struct {
   union {
     bool boolean;
     double number;
-    Object *object;
+    Object* object;
   } payload;
 } Value;
 
@@ -42,21 +42,21 @@ typedef struct {
 
 
 typedef struct {
-  Value *values;
+  Value* values;
   int capacity;
   int count;
 } ValueArray;
 
-void value_init(ValueArray *array) {
+void value_init(ValueArray* array) {
   *array = (ValueArray){ NULL, 0, 0 };
 }
 
-void value_delete(ValueArray *array) {
+void value_delete(ValueArray* array) {
   FREE_ARRAY(Value, array->values, array->capacity);
 }
 
-void value_append(ValueArray *array, Value value) {
-  if (array->capacity < array->count + 1) {
+void value_append(ValueArray* array, Value value) {
+  if ( array->capacity < array->count + 1 ) {
     int capacity = array->capacity;
     array->capacity = GROW_CAPACITY(capacity);
     array->values = GROW_ARRAY(Value, array->values, capacity, array->capacity);
@@ -68,8 +68,8 @@ void value_append(ValueArray *array, Value value) {
 void value_oprint(Value object);
 
 void value_print(Value value) {
-  switch (value.type) {
-  case VAL_BOOL:    printf(AS_BOOL(value) ? "true" : "false"); break;
+  switch ( value.type ) {
+  case VAL_BOOL:   printf(AS_BOOL(value) ? "true" : "false");  break;
   case VAL_NUMBER: printf("%g", AS_NUMBER(value));             break;
   case VAL_OBJECT: value_oprint(value);                        break;
   case VAL_NIL: printf("nil");                                 break;

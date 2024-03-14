@@ -1,0 +1,28 @@
+fun add(a) {
+  fun to(b) {
+    return a + b;
+  }
+  return to;
+}
+
+var x = "outer_x";
+
+fun outer_fun() {
+  var x = "inner_x";
+  fun inner_fun() {
+    print x;
+  }
+  // Which x gets printed.
+  inner_fun();
+}
+
+outer_fun();
+
+fun test_add() {
+  var add5 = add(5);
+  print add;
+  print add5;
+  print add5(10);
+}
+
+test_add();

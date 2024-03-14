@@ -1,0 +1,18 @@
+fun L1() {
+  var l1 = 2;
+  fun L2() {
+    var l2 = 3;
+    fun L3() {
+      var l3 = 4;
+      fun L4() {
+        return l1 + l2 + l3 + 5;
+      }
+      return L4();
+    }
+    return L3();
+  }
+  return L2();
+}
+
+//evaluates: 2 + 3 + 4 + 5
+print L1(); // prints: 14

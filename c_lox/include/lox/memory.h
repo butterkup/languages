@@ -20,13 +20,14 @@ CLOX_BEG_DECLS
 #define ALLOCATE(Type, Size) \
   (Type *)reallocate(NULL, 0, sizeof(Type) * (Size))
 
-void *reallocate(void *ptr, size_t osize, size_t nsize) {
-  if (nsize == 0) {
+
+void* reallocate(void* ptr, size_t osize, size_t nsize) {
+  if ( nsize == 0 ) {
     free(ptr);
     return NULL;
   }
-  void *result = realloc(ptr, nsize);
-  if (result == NULL) exit(EXIT_FAILURE);
+  void* result = realloc(ptr, nsize);
+  if ( result == NULL ) exit(EXIT_FAILURE);
   return result;
 }
 

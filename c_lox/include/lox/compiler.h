@@ -47,32 +47,38 @@ typedef enum {
   TYPE_SCRIPT
 } FunctionType;
 
+typedef struct {
+  uint8_t index;
+  bool is_local;
+} Upvalue;
+
 typedef struct Compiler Compiler;
 
 struct Compiler {
-  Compiler *enclosing;
-  ObjectFunction *function;
+  Compiler* enclosing;
+  ObjectFunction* function;
   FunctionType type;
   Local locals[UINT8_COUNT];
   int local_count;
   int scope_depth;
+  Upvalue upvalues[UINT8_COUNT];
 };
 
 Parser parser;
-Compiler *current = NULL;
+Compiler* current = NULL;
 
-void comp_init(Compiler *comp, FunctionType type) {
+void comp_init(Compiler* comp, FunctionType type) {
   comp->function = new_function();
   comp->local_count = 0;
   comp->scope_depth = 0;
   comp->type = type;
   comp->enclosing = current;
   current = comp;
-  if (type != TYPE_SCRIPT)
+  if ( type != TYPE_SCRIPT )
     current->function->name = copy_string(
       parser.previous.start, parser.previous.length
     );
-  Local *local = &current->locals[current->local_count++];
+  Local* local = &current->locals[current->local_count++];
   local->depth = 0;
   local->name.start = "";
   local->name.length = 0;
@@ -98,71 +104,71 @@ void expr_grouping(bool);
 void expr_variable(bool);
 void expr_call(bool);
 bool compiler_match(TokenType);
-ObjectFunction *compiler_delete();
+ObjectFunction* compiler_delete();
 bool compiler_check(TokenType);
-uint8_t identifier_constant(Token *);
-bool identifier_equal(Token *, Token *);
-void compiler_consume(TokenType, const char *);
+uint8_t identifier_constant(Token*);
+bool identifier_equal(Token*, Token*);
+void compiler_consume(TokenType, const char*);
 
 #define TKPREC_RULE(tktp, prefix, infix, precedence) [TOKEN##tktp] = { prefix, infix, PREC##precedence }
 
 ParserRule tkprec_rules[] = {
-  TKPREC_RULE(_LEFT_PAREN,     expr_grouping,  expr_call,    _CALL),
-  TKPREC_RULE(_RIGHT_PAREN,    NULL,           NULL,         _NONE),
-  TKPREC_RULE(_LEFT_BRACE,     NULL,           NULL,         _NONE),
-  TKPREC_RULE(_RIGHT_BRACE,    NULL,           NULL,         _NONE),
-  TKPREC_RULE(_COMMA,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_DOT,            NULL,           NULL,         _NONE),
-  TKPREC_RULE(_MINUS,          expr_unary,     expr_binary,  _TERM),
-  TKPREC_RULE(_PLUS,           NULL,           expr_binary,  _TERM),
-  TKPREC_RULE(_SEMICOLON,      NULL,           NULL,         _NONE),
-  TKPREC_RULE(_SLASH,          NULL,           expr_binary,  _FACTOR),
-  TKPREC_RULE(_STAR,           NULL,           expr_binary,  _FACTOR),
-  TKPREC_RULE(_BANG,           expr_unary,     NULL,         _NONE),
-  TKPREC_RULE(_BANG_EQUAL,     NULL,           expr_binary,  _EQUALITY),
-  TKPREC_RULE(_EQUAL,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_EQUAL_EQUAL,    NULL,           expr_binary,  _EQUALITY),
-  TKPREC_RULE(_GREATER,        NULL,           expr_binary,  _COMPARISON),
-  TKPREC_RULE(_GREATER_EQUAL,  NULL,           expr_binary,  _COMPARISON),
-  TKPREC_RULE(_LESS,           NULL,           expr_binary,  _COMPARISON),
-  TKPREC_RULE(_LESS_EQUAL,     NULL,           expr_binary,  _COMPARISON),
-  TKPREC_RULE(_IDENTIFIER,     expr_variable,  NULL,         _NONE),
-  TKPREC_RULE(_STRING,         expr_string,    NULL,         _NONE),
-  TKPREC_RULE(_NUMBER,         expr_number,    NULL,         _NONE),
-  TKPREC_RULE(_AND,            NULL,           expr_and,     _AND),
-  TKPREC_RULE(_CLASS,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_ELSE,           NULL,           NULL,         _NONE),
-  TKPREC_RULE(_FALSE,          literal,        NULL,         _NONE),
-  TKPREC_RULE(_FOR,            NULL,           NULL,         _NONE),
-  TKPREC_RULE(_FUN,            NULL,           NULL,         _NONE),
-  TKPREC_RULE(_IF,             NULL,           NULL,         _NONE),
-  TKPREC_RULE(_NIL,            literal,        NULL,         _NONE),
-  TKPREC_RULE(_OR,             NULL,           expr_or,      _OR),
-  TKPREC_RULE(_PRINT,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_RETURN,         NULL,           NULL,         _NONE),
-  TKPREC_RULE(_SUPER,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_THIS,           NULL,           NULL,         _NONE),
-  TKPREC_RULE(_TRUE,           literal,        NULL,         _NONE),
-  TKPREC_RULE(_VAR,            NULL,           NULL,         _NONE),
-  TKPREC_RULE(_WHILE,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_ERROR,          NULL,           NULL,         _NONE),
-  TKPREC_RULE(_EOF,            NULL,           NULL,         _NONE)
+  TKPREC_RULE(_LEFT_PAREN,       expr_grouping,      expr_call,      _CALL),
+  TKPREC_RULE(_RIGHT_PAREN,      NULL,               NULL,           _NONE),
+  TKPREC_RULE(_LEFT_BRACE,       NULL,               NULL,           _NONE),
+  TKPREC_RULE(_RIGHT_BRACE,      NULL,               NULL,           _NONE),
+  TKPREC_RULE(_COMMA,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_DOT,              NULL,               NULL,           _NONE),
+  TKPREC_RULE(_MINUS,            expr_unary,         expr_binary,    _TERM),
+  TKPREC_RULE(_PLUS,             NULL,               expr_binary,    _TERM),
+  TKPREC_RULE(_SEMICOLON,        NULL,               NULL,           _NONE),
+  TKPREC_RULE(_SLASH,            NULL,               expr_binary,    _FACTOR),
+  TKPREC_RULE(_STAR,             NULL,               expr_binary,    _FACTOR),
+  TKPREC_RULE(_BANG,             expr_unary,         NULL,           _NONE),
+  TKPREC_RULE(_BANG_EQUAL,       NULL,               expr_binary,    _EQUALITY),
+  TKPREC_RULE(_EQUAL,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_EQUAL_EQUAL,      NULL,               expr_binary,    _EQUALITY),
+  TKPREC_RULE(_GREATER,          NULL,               expr_binary,    _COMPARISON),
+  TKPREC_RULE(_GREATER_EQUAL,    NULL,               expr_binary,    _COMPARISON),
+  TKPREC_RULE(_LESS,             NULL,               expr_binary,    _COMPARISON),
+  TKPREC_RULE(_LESS_EQUAL,       NULL,               expr_binary,    _COMPARISON),
+  TKPREC_RULE(_IDENTIFIER,       expr_variable,      NULL,           _NONE),
+  TKPREC_RULE(_STRING,           expr_string,        NULL,           _NONE),
+  TKPREC_RULE(_NUMBER,           expr_number,        NULL,           _NONE),
+  TKPREC_RULE(_AND,              NULL,               expr_and,       _AND),
+  TKPREC_RULE(_CLASS,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_ELSE,             NULL,               NULL,           _NONE),
+  TKPREC_RULE(_FALSE,            literal,            NULL,           _NONE),
+  TKPREC_RULE(_FOR,              NULL,               NULL,           _NONE),
+  TKPREC_RULE(_FUN,              NULL,               NULL,           _NONE),
+  TKPREC_RULE(_IF,               NULL,               NULL,           _NONE),
+  TKPREC_RULE(_NIL,              literal,            NULL,           _NONE),
+  TKPREC_RULE(_OR,               NULL,               expr_or,        _OR),
+  TKPREC_RULE(_PRINT,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_RETURN,           NULL,               NULL,           _NONE),
+  TKPREC_RULE(_SUPER,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_THIS,             NULL,               NULL,           _NONE),
+  TKPREC_RULE(_TRUE,             literal,            NULL,           _NONE),
+  TKPREC_RULE(_VAR,              NULL,               NULL,           _NONE),
+  TKPREC_RULE(_WHILE,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_ERROR,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_EOF,              NULL,               NULL,           _NONE)
 };
 
 #undef TKPREC_RULE
 
-ParserRule *get_rule(TokenType tktype) {
+ParserRule* get_rule(TokenType tktype) {
   return &tkprec_rules[tktype];
 }
 
 void parse_precedence(Precedence);
 
-void _error_at(Token *token, const char *message) {
-  if (parser.panic_mode) return;
+void _error_at(Token* token, const char* message) {
+  if ( parser.panic_mode ) return;
   parser.panic_mode = true;
   parser.had_error = true;
   fprintf(stderr, "[line %d] Error", token->line);
-  switch (token->type) {
+  switch ( token->type ) {
   case TOKEN_EOF: fprintf(stderr, " at end"); break;
   case TOKEN_ERROR: break;
   default: fprintf(stderr, " at '%.*s'", token->length, token->start);
@@ -170,11 +176,11 @@ void _error_at(Token *token, const char *message) {
   fprintf(stderr, ": %s\n", message);
 }
 
-void error(const char *message) {
+void error(const char* message) {
   _error_at(&parser.previous, message);
 }
 
-void error_at(const char *message) {
+void error_at(const char* message) {
   _error_at(&parser.current, message);
 }
 
@@ -196,9 +202,9 @@ void expr_or(bool) {
 
 void compiler_sync() {
   parser.panic_mode = false;
-  while (!compiler_check(TOKEN_EOF)) {
-    if (compiler_check(TOKEN_SEMICOLON)) return;
-    switch (parser.current.type) {
+  while ( !compiler_check(TOKEN_EOF) ) {
+    if ( compiler_check(TOKEN_SEMICOLON) ) return;
+    switch ( parser.current.type ) {
     case TOKEN_RETURN:
     case TOKEN_CLASS:
     case TOKEN_WHILE:
@@ -214,13 +220,13 @@ void compiler_sync() {
 
 void compiler_advance() {
   parser.previous = parser.current;
-  for (;;) {
+  for ( ;;) {
     parser.current = scan();
 #ifdef CLOX_SCAN_TRACE
-    if (!is_at_end() || parser.previous.type != TOKEN_EOF)
+    if ( !is_at_end() || parser.previous.type != TOKEN_EOF )
       token_print(&parser.current);
 #endif
-    if (parser.current.type != TOKEN_ERROR) break;
+    if ( parser.current.type != TOKEN_ERROR ) break;
     error_at(parser.current.start);
   }
 }
@@ -229,12 +235,12 @@ bool compiler_check(TokenType type) {
   return parser.current.type == type;
 }
 
-void compiler_consume(TokenType type, const char *message) {
-  if (compiler_check(type)) compiler_advance();
+void compiler_consume(TokenType type, const char* message) {
+  if ( compiler_check(type) ) compiler_advance();
   else error_at(message);
 }
 
-Chunk *current_chunk() { return &current->function->chunk; }
+Chunk* current_chunk() { return &current->function->chunk; }
 
 void emit_byte(uint8_t byte) {
   chunk_append(current_chunk(), byte, parser.previous.line);
@@ -250,7 +256,7 @@ void emit_return() {
 
 uint8_t make_constant(Value constant) {
   int location = chunk_cappend(current_chunk(), constant);
-  if (location <= UINT8_MAX) return (uint8_t)location;
+  if ( location <= UINT8_MAX ) return (uint8_t)location;
   error("Too many constants in one chunk.");
   return 0;
 }
@@ -260,10 +266,10 @@ void emit_constant(Value constant) {
 }
 
 void literal(bool) {
-  switch (parser.previous.type) {
-  case TOKEN_NIL: emit_byte(OP_NIL);     break;
-  case TOKEN_TRUE: emit_byte(OP_TRUE);   break;
-  case TOKEN_FALSE: emit_byte(OP_FALSE); break;
+  switch ( parser.previous.type ) {
+  case TOKEN_NIL: emit_byte(OP_NIL);      break;
+  case TOKEN_TRUE: emit_byte(OP_TRUE);    break;
+  case TOKEN_FALSE: emit_byte(OP_FALSE);  break;
   default: printf("Unknown literal type[%d]: %s -> '%.*s'\n",
     parser.previous.type,
     strtokentype(parser.previous.type),
@@ -282,31 +288,62 @@ void expr_string(bool) {
   emit_constant(OBJECT_VAL(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
-int resolve_local(Compiler *compiler, Token *name) {
+int resolve_local(Compiler* compiler, Token* name) {
   bool unintialized = false;
-  for (int i = compiler->local_count - 1; i >= 0; --i)
-    if (identifier_equal(name, &(compiler->locals + i)->name))
-      if ((compiler->locals + i)->depth == -1) unintialized = true;
+  for ( int i = compiler->local_count - 1; i >= 0; --i )
+    if ( identifier_equal(name, &(compiler->locals + i)->name) )
+      if ( (compiler->locals + i)->depth == -1 ) unintialized = true;
       else return i;
 #ifndef CLOX_VAR_NO_SELF_INIT
-  if (unintialized) error("Variable used in its own initializer.");
+  if ( unintialized ) error("Variable used in its own initializer.");
 #endif
   return -1;
 }
 
+int add_upvalue(Compiler* compiler, uint8_t index, bool is_local) {
+  int upvalue_count = compiler->function->upvalue_count;
+  Upvalue* upvalue;
+  for ( int i = 0; i < upvalue_count; ++i ) {
+    upvalue = &compiler->upvalues[i];
+    if ( upvalue->index == index && upvalue->is_local == is_local )
+      return i;
+  }
+  if ( upvalue_count == UINT8_COUNT ) {
+    error("Too many closure variables in function.");
+    return 0;
+  }
+  compiler->upvalues[upvalue_count].is_local = is_local;
+  compiler->upvalues[upvalue_count].index = index;
+  return compiler->function->upvalue_count++;
+}
+
+int resolve_upvalue(Compiler* compiler, Token* name) {
+  if ( compiler->enclosing == NULL ) return -1;
+  int local = resolve_local(compiler->enclosing, name);
+  if ( local != -1 ) return add_upvalue(compiler, (uint8_t)local, true);
+  local = resolve_upvalue(compiler->enclosing, name);
+  if ( local != -1 ) return add_upvalue(compiler, (uint8_t)local, false);
+  return -1;
+}
+
 void named_variable(Token name, bool can_assign) {
-  int arg = resolve_local(current, &name);
-  uint8_t set_op = OP_SET_LOCAL, get_op = OP_GET_LOCAL;
-  if (arg == -1) {
+  int arg;
+  uint8_t set_op, get_op;
+  if ( (arg = resolve_local(current, &name)) != -1 ) {
+    set_op = OP_SET_LOCAL;
+    get_op = OP_GET_LOCAL;
+  } else if ( (arg = resolve_upvalue(current, &name)) != -1 ) {
+    set_op = OP_SET_UPVALUE;
+    get_op = OP_GET_UPVALUE;
+  } else {
     arg = identifier_constant(&name);
     set_op = OP_SET_GLOBAL;
     get_op = OP_GET_GLOBAL;
   }
-  if (can_assign && compiler_match(TOKEN_EQUAL)) {
-    expression();
-    emit_bytes(set_op, (uint8_t)arg);
-  }
-  else emit_bytes(get_op, (uint8_t)arg);
+
+  if ( can_assign && compiler_match(TOKEN_EQUAL) ) {
+    expression(); emit_bytes(set_op, (uint8_t)arg);
+  } else emit_bytes(get_op, (uint8_t)arg);
 }
 
 void expr_variable(bool can_assign) {
@@ -315,10 +352,10 @@ void expr_variable(bool can_assign) {
 
 uint8_t argument_list() {
   uint8_t arg_count = 0;
-  if (!compiler_check(TOKEN_RIGHT_PAREN)) do {
-    expression(); if (arg_count++ == 255)
+  if ( !compiler_check(TOKEN_RIGHT_PAREN) ) do {
+    expression(); if ( arg_count++ == 255 )
       error("Can't have more than 255 arguments.");
-  } while (compiler_match(TOKEN_COMMA));
+  } while ( compiler_match(TOKEN_COMMA) );
   compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
   return arg_count;
 }
@@ -335,9 +372,9 @@ void expr_grouping(bool) {
 
 void expr_binary(bool) {
   TokenType optype = parser.previous.type;
-  ParserRule *rule = get_rule(optype);
+  ParserRule* rule = get_rule(optype);
   parse_precedence((Precedence)(rule->precedence + 1));
-  switch (optype) {
+  switch ( optype ) {
   case TOKEN_PLUS:          emit_byte(OP_ADD);              break;
   case TOKEN_LESS:          emit_byte(OP_LESS);             break;
   case TOKEN_EQUAL_EQUAL:   emit_byte(OP_EQUAL);            break;
@@ -357,11 +394,12 @@ void expr_binary(bool) {
 void expr_unary(bool) {
   TokenType optype = parser.previous.type;
   parse_precedence(PREC_UNARY);
-  switch (optype) {
+  switch ( optype ) {
   case TOKEN_BANG: emit_byte(OP_NOT);     break;
   case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
   default:
-    printf("Unrecognized expr unary token type[%d]: '%s'\n", optype, inst_print(optype));
+    printf("Unrecognized expr unary token type[%d]: '%s'\n",
+      optype, inst_print(optype));
     exit(1);
   }
 }
@@ -370,62 +408,61 @@ void parse_precedence(Precedence precedence) {
   compiler_advance();
   ParseFn prefix_rule = get_rule(parser.previous.type)->prefix;
   bool can_assign = precedence <= PREC_ASSIGNMENT;
-  if (prefix_rule != NULL) prefix_rule(can_assign);
+  if ( prefix_rule != NULL ) prefix_rule(can_assign);
   else error("Expect expression.");
-  while (precedence <= get_rule(parser.current.type)->precedence) {
+  while ( precedence <= get_rule(parser.current.type)->precedence ) {
     compiler_advance();
     get_rule(parser.previous.type)->infix(can_assign);
   }
-  if (can_assign && compiler_match(TOKEN_EQUAL))
+  if ( can_assign && compiler_match(TOKEN_EQUAL) )
     error("Invalid assignment target.");
 }
 
-uint8_t identifier_constant(Token *token) {
+uint8_t identifier_constant(Token* token) {
   return make_constant(OBJECT_VAL(copy_string(token->start, token->length)));
 }
 
 void add_local(Token name) {
-  if (current->local_count == UINT8_COUNT) {
+  if ( current->local_count == UINT8_COUNT ) {
     error("Too many local variables in scope.");
     return;
   }
-  Local *local = current->locals + (current->local_count++);
+  Local* local = current->locals + (current->local_count++);
   local->depth = -1;
   local->name = name;
 }
 
-bool identifier_equal(Token *id1, Token *id2) {
-  if (id1->length != id2->length) return false;
+bool identifier_equal(Token* id1, Token* id2) {
+  if ( id1->length != id2->length ) return false;
   return !memcmp(id1->start, id2->start, id1->length);
 }
 
 void declare_variable() {
-  if (current->scope_depth == 0) return;
-  Token *name = &parser.previous;
-  Local *local;
-  for (int i = current->local_count - 1; i >= 0; --i) {
+  if ( current->scope_depth == 0 ) return;
+  Token* name = &parser.previous;
+  Local* local;
+  for ( int i = current->local_count - 1; i >= 0; --i ) {
     local = current->locals + i;
-    if (local->depth != -1 && local->depth < current->scope_depth) break;
-    if (identifier_equal(name, &local->name))
+    if ( local->depth != -1 && local->depth < current->scope_depth ) break;
+    if ( identifier_equal(name, &local->name) )
       error("Local variable already exists in the current scope.");
-  }
-  add_local(*name);
+  } add_local(*name);
 }
 
-uint8_t parse_variable(const char *error_message) {
+uint8_t parse_variable(const char* error_message) {
   compiler_consume(TOKEN_IDENTIFIER, error_message);
   declare_variable();
-  if (current->scope_depth > 0) return 0;
+  if ( current->scope_depth > 0 ) return 0;
   return identifier_constant(&parser.previous);
 }
 
 void mark_initialized() {
-  if (current->scope_depth == 0) return;
+  if ( current->scope_depth == 0 ) return;
   current->locals[current->local_count - 1].depth = current->scope_depth;
 }
 
 void define_variable(uint8_t global) {
-  if (current->scope_depth > 0) mark_initialized();
+  if ( current->scope_depth > 0 ) mark_initialized();
   else emit_bytes(OP_DEFINE_GLOBAL, global);
 }
 
@@ -435,7 +472,7 @@ void consume_eos() {
 }
 
 bool compiler_match(TokenType type) {
-  if (!compiler_check(type)) return false;
+  if ( !compiler_check(type) ) return false;
   compiler_advance();
   return true;
 }
@@ -455,7 +492,7 @@ void stmt_print() {
 }
 
 void stmt_block() {
-  while (!compiler_check(TOKEN_RIGHT_BRACE) && !compiler_check(TOKEN_EOF))
+  while ( !compiler_check(TOKEN_RIGHT_BRACE) && !compiler_check(TOKEN_EOF) )
     stmt_declaration();
   compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
@@ -463,10 +500,10 @@ void stmt_block() {
 void scope_begin() { ++current->scope_depth; }
 
 void scope_end() {
-  Local *local;
-  while (current->local_count > 0) {
+  Local* local;
+  while ( current->local_count > 0 ) {
     local = current->locals + current->local_count - 1;
-    if (local->depth != current->scope_depth) break;
+    if ( local->depth != current->scope_depth ) break;
     --current->local_count;
     emit_byte(OP_POP);
   }
@@ -488,14 +525,14 @@ int emit_jump(OpCode jtype) {
 void emit_loop(int loop_start) {
   emit_byte(OP_LOOP);
   int offset = current_chunk()->count - loop_start + 2;
-  if (offset > UINT16_MAX) error("Loop Body too large.");
+  if ( offset > UINT16_MAX ) error("Loop Body too large.");
   emit_byte((offset >> 8) & 0xff);
   emit_byte(offset & 0xff);
 }
 
 void patch_jump(int offset) {
   int jump = current_chunk()->count - offset - 2;
-  if (jump > UINT16_MAX) error("Too much code to jump over.");
+  if ( jump > UINT16_MAX ) error("Too much code to jump over.");
   current_chunk()->code[offset] = (jump >> 8) & 0xff;
   current_chunk()->code[++offset] = jump & 0xff;
 }
@@ -510,7 +547,7 @@ void stmt_if() {
   int jump_else = emit_jump(OP_JUMP);
   patch_jump(jump_then);
   emit_byte(OP_POP);
-  if (compiler_match(TOKEN_ELSE)) stmt_statement();
+  if ( compiler_match(TOKEN_ELSE) ) stmt_statement();
   patch_jump(jump_else);
 }
 
@@ -530,18 +567,18 @@ void stmt_while() {
 void stmt_for() {
   scope_begin();
   compiler_consume(TOKEN_LEFT_PAREN, "Expect '(' after keyword for.");
-  if (compiler_match(TOKEN_SEMICOLON));
-  else if (compiler_match(TOKEN_VAR)) stmt_var();
+  if ( compiler_match(TOKEN_SEMICOLON) );
+  else if ( compiler_match(TOKEN_VAR) ) stmt_var();
   else stmt_expression();
   int loop_start = current_chunk()->count;
   int jump_exit = -1;
-  if (!compiler_match(TOKEN_SEMICOLON)) {
+  if ( !compiler_match(TOKEN_SEMICOLON) ) {
     expression();
     compiler_consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
     jump_exit = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
   }
-  if (!compiler_match(TOKEN_RIGHT_PAREN)) {
+  if ( !compiler_match(TOKEN_RIGHT_PAREN) ) {
     int jump_body = emit_jump(OP_JUMP);
     int start_increment = current_chunk()->count;
     expression();
@@ -553,7 +590,7 @@ void stmt_for() {
   }
   stmt_statement();
   emit_loop(loop_start);
-  if (jump_exit != -1) {
+  if ( jump_exit != -1 ) {
     patch_jump(jump_exit);
     emit_byte(OP_POP);
   }
@@ -561,9 +598,9 @@ void stmt_for() {
 }
 
 void stmt_return() {
-  if (current->type == TYPE_SCRIPT)
+  if ( current->type == TYPE_SCRIPT )
     error("Can't return from top level code.");
-  if (compiler_match(TOKEN_SEMICOLON)) emit_return();
+  if ( compiler_match(TOKEN_SEMICOLON) ) emit_return();
   else {
     expression();
     consume_eos();
@@ -572,18 +609,18 @@ void stmt_return() {
 }
 
 void stmt_statement() {
-  if (compiler_match(TOKEN_IF))              stmt_if();
-  else if (compiler_match(TOKEN_FOR))        stmt_for();
-  else if (compiler_match(TOKEN_PRINT))      stmt_print();
-  else if (compiler_match(TOKEN_WHILE))      stmt_while();
-  else if (compiler_match(TOKEN_RETURN))     stmt_return();
-  else if (compiler_match(TOKEN_LEFT_BRACE)) stmt_sblock();
-  else                                       stmt_expression();
+  if ( compiler_match(TOKEN_IF) )              stmt_if();
+  else if ( compiler_match(TOKEN_FOR) )        stmt_for();
+  else if ( compiler_match(TOKEN_PRINT) )      stmt_print();
+  else if ( compiler_match(TOKEN_WHILE) )      stmt_while();
+  else if ( compiler_match(TOKEN_RETURN) )     stmt_return();
+  else if ( compiler_match(TOKEN_LEFT_BRACE) ) stmt_sblock();
+  else                                         stmt_expression();
 }
 
 void stmt_var() {
   uint8_t global = parse_variable("Expect variable name.");
-  if (compiler_match(TOKEN_EQUAL)) expression();
+  if ( compiler_match(TOKEN_EQUAL) ) expression();
   else emit_byte(OP_NIL);
   consume_eos();
   define_variable(global);
@@ -595,14 +632,14 @@ void consume_function(FunctionType type) {
   scope_begin();
 
   compiler_consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
-  if (!compiler_check(TOKEN_RIGHT_PAREN)) {
+  if ( !compiler_check(TOKEN_RIGHT_PAREN) ) {
     do {
       current->function->arity++;
-      if (current->function->arity > 255)
+      if ( current->function->arity > 255 )
         error_at("Can't have more than 255 parameters.");
       uint8_t param = parse_variable("Expect parameter name.");
       define_variable(param);
-    } while (compiler_match(TOKEN_COMMA));
+    } while ( compiler_match(TOKEN_COMMA) );
   }
   compiler_consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
 
@@ -610,8 +647,10 @@ void consume_function(FunctionType type) {
   stmt_block();
   scope_end();
 
-  ObjectFunction *function = compiler_delete();
-  emit_bytes(OP_CONSTANT, make_constant(OBJECT_VAL(function)));
+  ObjectFunction* function = compiler_delete();
+  emit_bytes(OP_CLOSURE, make_constant(OBJECT_VAL(function)));
+  for ( int i = 0; i < function->upvalue_count; ++i )
+    emit_bytes(compiler.upvalues[i].is_local ? 1 : 0, compiler.upvalues[i].index);
 }
 
 void stmt_fun() {
@@ -622,10 +661,10 @@ void stmt_fun() {
 }
 
 void stmt_declaration() {
-  if (compiler_match(TOKEN_VAR)) stmt_var();
-  else if (compiler_match(TOKEN_FUN)) stmt_fun();
+  if ( compiler_match(TOKEN_VAR) ) stmt_var();
+  else if ( compiler_match(TOKEN_FUN) ) stmt_fun();
   else stmt_statement();
-  if (parser.panic_mode)
+  if ( parser.panic_mode )
     compiler_sync();
 }
 
@@ -634,22 +673,22 @@ void compiler_init() {
   parser.had_error = false;
 }
 
-ObjectFunction *compiler_delete() {
+ObjectFunction* compiler_delete() {
   emit_return();
-  ObjectFunction *function = current->function;
+  ObjectFunction* function = current->function;
   current = current->enclosing;
   return function;
 }
 
-ObjectFunction *compile(const char *source) {
+ObjectFunction* compile(const char* source) {
   Compiler compiler;
   compiler_init();
   comp_init(&compiler, TYPE_SCRIPT);
   scanner_init(source);
   compiler_advance();
-  while (!compiler_match(TOKEN_EOF)) stmt_declaration();
+  while ( !compiler_match(TOKEN_EOF) ) stmt_declaration();
   compiler_consume(TOKEN_EOF, "Expect end of expression.");
-  ObjectFunction *function = compiler_delete();
+  ObjectFunction* function = compiler_delete();
   return parser.had_error ? NULL : function;
 }
 
