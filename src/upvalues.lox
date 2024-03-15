@@ -14,5 +14,36 @@ fun L1() {
   return L2();
 }
 
-//evaluates: 2 + 3 + 4 + 5
-print L1(); // prints: 14
+var open_ans = 2 + 3 + 4 + 5;
+print L1();
+print L1() == open_ans;
+
+fun A(a) {
+  fun B(b) {
+    fun C(c) {
+      fun D(d) {
+        fun E(e) {
+          fun F() {
+            return a + b + c + d + e;
+          }
+          return F;
+        }
+        return E;
+      }
+      return D;
+    }
+    return C;
+  }
+  return B;
+}
+
+var b = A(10);
+var c = b(11);
+var d = c(12);
+var e = d(13);
+var f = e(14);
+
+var closed_ans = 10 + 11 + 12 + 13 + 14;
+
+print f();
+print f() == closed_ans;

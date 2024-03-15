@@ -47,6 +47,7 @@ typedef struct {
   Object* objects;
   Table strings;
   Table globals;
+  ObjectUpvalue* open_upvalues;
 } Vm;
 
 typedef enum {
@@ -81,7 +82,7 @@ Value stack_peek(int distance) {
 
 void reset_stack();
 ObjectUpvalue* new_upvalue(Value*);
-ObjectUpvalue *capture_upvalue(Value *);
+ObjectUpvalue* capture_upvalue(Value*);
 
 void runtime_error(const char* format, ...) {
   va_list args;
@@ -187,6 +188,16 @@ bool call_value(Value callee, int arg_count) {
   return false;
 }
 
+void close_upvalues(Value *last) {
+  ObjectUpvalue *upvalue;
+  while (vm.open_upvalues != NULL && vm.open_upvalues->location >= last) {
+    upvalue = vm.open_upvalues;
+    upvalue->closed = *upvalue->location;
+    upvalue->location = &upvalue->closed;
+    vm.open_upvalues = upvalue->next;
+  }
+}
+
 InterpretResult run() {
 #ifdef CLOX_AINST_TRACE
   disassemble_chunk(&CHUNK(), "All Instructions");
@@ -224,8 +235,10 @@ InterpretResult run() {
     case OP_JUMP_IF_FALSE: VMIP() += BOOL_COND() * READ_SHORT();              break;
     case OP_JUMP:          VMIP() += READ_SHORT();                            break;
     case OP_LOOP:          VMIP() -= READ_SHORT();                            break;
+    case OP_CLOSE_UPVALUE: close_upvalues(vm.stack_top - 1); stack_pop();     break;
     case OP_RETURN: {
       Value result = stack_pop();
+      close_upvalues(TOP_FRAME()->slots);
       --vm.frame_count;
       if ( vm.frame_count == 0 ) {
         stack_pop();
@@ -243,9 +256,9 @@ InterpretResult run() {
       ObjectClosure* closure = new_closure(function);
       stack_push(OBJECT_VAL(closure));
       for ( int i = 0; i < closure->upvalue_count; ++i )
-        closure->upvalues[i] = READ_BYTE()?
-          capture_upvalue(TOP_FRAME()->slots + READ_BYTE()):
-          TOP_FRAME()->closure->upvalues[READ_BYTE()];                        break;
+        closure->upvalues[i] = READ_BYTE() ?
+        capture_upvalue(TOP_FRAME()->slots + READ_BYTE()) :
+        TOP_FRAME()->closure->upvalues[READ_BYTE()];                        break;
     }
     case OP_CALL: {
       int arg_count = READ_BYTE();
@@ -363,6 +376,7 @@ int run_file(const char* path) {
 void reset_stack() {
   vm.stack_top = vm.stack;
   vm.frame_count = 0;
+  vm.open_upvalues = NULL;
 }
 
 void new_object(Object* object) {
@@ -391,14 +405,18 @@ ObjectClosure* new_closure(ObjectFunction* function) {
 }
 
 ObjectUpvalue* new_upvalue(Value* slot) {
-  ObjectUpvalue *upvalue = ALLOCATE_OBJECT(ObjectUpvalue, OBJ_UPVALUE);
+  ObjectUpvalue* upvalue = ALLOCATE_OBJECT(ObjectUpvalue, OBJ_UPVALUE);
+  upvalue->closed = NIL_VAL;
   upvalue->location = slot;
+  upvalue->next = NULL;
   return upvalue;
 }
 
-ObjectUpvalue *capture_upvalue(Value* slot) {
-  ObjectUpvalue *created = new_upvalue(slot);
-  return created;
+ObjectUpvalue* capture_upvalue(Value* slot) {
+  ObjectUpvalue* prev = NULL, * upvalue = vm.open_upvalues;
+  while ( upvalue != NULL && upvalue->location > slot ) { prev = upvalue; upvalue = upvalue->next; }
+  if ( upvalue != NULL && upvalue->location == slot ) return upvalue;
+  return *(prev == NULL ? &vm.open_upvalues : &prev->next) = new_upvalue(slot);
 }
 
 void vm_init() {

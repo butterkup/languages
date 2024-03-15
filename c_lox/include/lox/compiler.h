@@ -40,6 +40,7 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
+  bool is_captured;
 } Local;
 
 typedef enum {
@@ -82,6 +83,7 @@ void comp_init(Compiler* comp, FunctionType type) {
   local->depth = 0;
   local->name.start = "";
   local->name.length = 0;
+  local->is_captured = false;
 }
 
 void stmt_var();
@@ -320,7 +322,8 @@ int add_upvalue(Compiler* compiler, uint8_t index, bool is_local) {
 int resolve_upvalue(Compiler* compiler, Token* name) {
   if ( compiler->enclosing == NULL ) return -1;
   int local = resolve_local(compiler->enclosing, name);
-  if ( local != -1 ) return add_upvalue(compiler, (uint8_t)local, true);
+  if ( local != -1 ) return add_upvalue(compiler, (uint8_t)local,
+    (compiler->enclosing->locals[local].is_captured = true));
   local = resolve_upvalue(compiler->enclosing, name);
   if ( local != -1 ) return add_upvalue(compiler, (uint8_t)local, false);
   return -1;
@@ -386,7 +389,8 @@ void expr_binary(bool) {
   case TOKEN_BANG_EQUAL:    emit_bytes(OP_EQUAL, OP_NOT);   break;
   case TOKEN_LESS_EQUAL:    emit_bytes(OP_GREATER, OP_NOT); break;
   default:
-    printf("Unrecognized expr binary token type[%d]: '%s'\n", optype, inst_print(optype));
+    printf("Unrecognized expr binary token type[%d]: '%s'\n",
+      optype, inst_print(optype));
     exit(1);
   }
 }
@@ -505,7 +509,8 @@ void scope_end() {
     local = current->locals + current->local_count - 1;
     if ( local->depth != current->scope_depth ) break;
     --current->local_count;
-    emit_byte(OP_POP);
+    emit_byte(current->locals[current->local_count - 1]
+      .is_captured? OP_CLOSE_UPVALUE: OP_POP);
   }
   --current->scope_depth;
 }

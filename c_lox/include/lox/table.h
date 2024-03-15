@@ -18,6 +18,7 @@ typedef struct {
 } Table;
 
 #include "object.h"
+
 void table_print(Table*);
 
 void table_init(Table* table) {
@@ -31,7 +32,7 @@ void table_delete(Table* table) {
 }
 
 uint32_t fnv1a_algo(const char* chars, int length) {
-  uint32_t hash = 2166136261u;
+  uint32_t hash = 2'166'136'261u;
   for ( int idx = 0; idx < length; ++idx )
     hash *= (hash ^ chars[idx]);
   return hash;
@@ -45,7 +46,10 @@ uint32_t my_hash(const char* chars, int length) {
 }
 
 uint32_t hash_string(const char* chars, int length) {
-  return my_hash(chars, length); // Redirect to the desired hash algorithm.
+#ifndef HASH_FUNCTION
+# define HASH_FUNCTION my_hash
+#endif
+  return HASH_FUNCTION(chars, length); // Redirect to the desired hash algorithm.
 }
 
 Entry* entry_find(Entry* entries, int capacity, ObjectString* key) {

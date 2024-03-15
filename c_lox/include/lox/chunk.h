@@ -8,6 +8,7 @@
 CLOX_BEG_DECLS
 
 typedef enum {
+  OP_CLOSE_UPVALUE,
   OP_JUMP_IF_FALSE,
   OP_DEFINE_GLOBAL,
   OP_SET_UPVALUE,
@@ -43,6 +44,7 @@ typedef enum {
 const char *inst_print(uint8_t byte) {
   switch (byte)
   {
+  INSTCS(_CLOSE_UPVALUE);
   INSTCS(_JUMP_IF_FALSE);
   INSTCS(_DEFINE_GLOBAL);
   INSTCS(_SET_UPVALUE);
