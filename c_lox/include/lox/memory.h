@@ -20,8 +20,14 @@ CLOX_BEG_DECLS
 #define ALLOCATE(Type, Size) \
   (Type *)reallocate(NULL, 0, sizeof(Type) * (Size))
 
+void collect_garbage();
 
 void* reallocate(void* ptr, size_t osize, size_t nsize) {
+  if (nsize > osize) {
+#ifdef CLOX_GC_STRESS
+    collect_garbage();
+#endif // CLOX_GC_STRESS
+  }
   if ( nsize == 0 ) {
     free(ptr);
     return NULL;

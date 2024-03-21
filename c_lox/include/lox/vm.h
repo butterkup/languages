@@ -48,6 +48,9 @@ typedef struct {
   Table strings;
   Table globals;
   ObjectUpvalue* open_upvalues;
+  int gray_count;
+  int gray_capacity;
+  Object** gray_stack;
 } Vm;
 
 typedef enum {
@@ -142,14 +145,16 @@ ObjectString* take_string(char* chars, int length) {
 }
 
 void concatenate_string() {
-  ObjectString* b = AS_STRING(stack_pop());
-  ObjectString* a = AS_STRING(stack_pop());
+  ObjectString* b = AS_STRING(stack_peek(0));
+  ObjectString* a = AS_STRING(stack_peek(1));
   int length = a->length + b->length;
   char* payload = ALLOCATE(char, length + 1);
   payload[length] = '\0';
   memcpy(payload, a->chars, a->length);
   memcpy(payload + a->length, b->chars, b->length);
   ObjectString* result = take_string(payload, length);
+  stack_pop();
+  stack_pop();
   stack_push(OBJECT_VAL(result));
 }
 
@@ -188,9 +193,9 @@ bool call_value(Value callee, int arg_count) {
   return false;
 }
 
-void close_upvalues(Value *last) {
-  ObjectUpvalue *upvalue;
-  while (vm.open_upvalues != NULL && vm.open_upvalues->location >= last) {
+void close_upvalues(Value* last) {
+  ObjectUpvalue* upvalue;
+  while ( vm.open_upvalues != NULL && vm.open_upvalues->location >= last ) {
     upvalue = vm.open_upvalues;
     upvalue->closed = *upvalue->location;
     upvalue->location = &upvalue->closed;
@@ -317,9 +322,9 @@ InterpretResult
 interpret(const char* source) {
   ObjectFunction* function = compile(source);
   if ( function == NULL ) return INTERPRET_COMPILE_ERROR;
-  // stack_push(OBJECT_VAL(function));
+  stack_push(OBJECT_VAL(function));
   ObjectClosure* closure = new_closure(function);
-  // stack_pop();
+  stack_pop();
   stack_push(OBJECT_VAL(closure));
   call_value(OBJECT_VAL(closure), 0);
   return run();
@@ -423,6 +428,9 @@ void vm_init() {
   table_init(&vm.globals);
   table_init(&vm.strings);
   vm.objects = NULL;
+  vm.gray_capacity = 0;
+  vm.gray_count = 0;
+  vm.gray_stack = NULL;
   reset_stack();
   setup_lox_native();
 }
@@ -435,6 +443,128 @@ void vm_delete() {
   table_delete(&vm.globals);
   table_delete(&vm.strings);
   objects_delete(vm.objects);
+  free(vm.gray_stack);
+}
+
+// GARBAGE COLLECTOR LIVES HERE: POOR CODE STRUCTURE.
+
+void gc_mark_object(Object* object) {
+  if ( object == NULL ) return;
+  if ( object->is_marked ) return;
+#ifdef CLOX_GC_LOG
+  printf("%p mark ", (void*)object);
+  value_print(OBJECT_VAL(object));
+  putchar(10);
+#endif // CLOX_GC_LOG
+  object->is_marked = true;
+  if ( vm.gray_capacity < vm.gray_count + 1 ) {
+    vm.gray_capacity = GROW_CAPACITY(vm.gray_capacity);
+    vm.gray_stack = realloc(vm.gray_stack, sizeof(Object*) * vm.gray_capacity);
+    if ( vm.gray_stack == NULL ) exit(1);
+  }
+  vm.gray_stack[vm.gray_count++] = object;
+}
+
+void gc_mark_value(Value value) {
+  if ( !IS_OBJECT(value) ) return;
+  gc_mark_object(AS_OBJECT(value));
+}
+
+void gc_mark_table(Table* table) {
+  Entry* entry;
+  for ( int i = 0; i < table->capacity; ++i ) {
+    entry = &table->entries[i];
+    gc_mark_object((Object*)entry->key);
+    gc_mark_value(entry->value);
+  }
+}
+
+void gc_mark_roots() {
+  for ( Value* slot = vm.stack; slot < vm.stack_top; ++slot )
+    gc_mark_value(*slot);
+  for ( int i = 0; i < vm.frame_count; ++i )
+    gc_mark_object((Object*)vm.frames[i].closure);
+  for ( ObjectUpvalue* upv = vm.open_upvalues; upv != NULL; upv = upv->next )
+    gc_mark_object((Object*)upv);
+  gc_mark_compiler_roots();
+  gc_mark_table(&vm.globals);
+}
+
+void gc_mark_array(ValueArray* array) {
+  for ( int i = 0; i < array->count; ++i )
+    gc_mark_value(array->values[i]);
+}
+
+void gc_blacken_object(Object* object) {
+#ifdef CLOX_GC_LOG
+  printf("%p blacken ", (void*)object);
+  value_print(OBJECT_VAL(object));
+  putchar(10);
+#endif // CLOX_GC_LOG
+  switch ( object->type ) {
+  case OBJ_NATIVE:
+  case OBJ_STRING:                                                   break;
+  case OBJ_UPVALUE: gc_mark_value(((ObjectUpvalue*)object)->closed); break;
+  case OBJ_FUNCTION: {
+    ObjectFunction* func = (ObjectFunction*)object;
+    gc_mark_object((Object*)func->name);
+    gc_mark_array(&func->chunk.constants);                           break;
+  }
+  case OBJ_CLOSURE: {
+    ObjectClosure* closure = (ObjectClosure*)object;
+    gc_mark_object((Object*)closure->function);
+    for ( int i = 0; i < closure->upvalue_count; ++i )
+      gc_mark_object((Object*)closure->upvalues[i]);                 break;
+  }
+  }
+}
+
+void gc_table_remove_white(Table *table) {
+  Entry *entry;
+  for (int i = 0; i < table->capacity; ++i) {
+    entry = &table->entries[i];
+    if (entry->key != NULL && !entry->key->object.is_marked)
+      table_del(table, entry->key);
+  }
+}
+
+void gc_trace_references() {
+  while ( vm.gray_count > 0 )
+    gc_blacken_object(vm.gray_stack[--vm.gray_count]);
+}
+
+void gc_sweep() {
+  Object* prev = NULL, * obj = vm.objects, * slot;
+  while ( obj != NULL ) {
+    if ( obj->is_marked ) {
+      obj->is_marked = false;
+      prev = obj; obj = obj->next;
+      continue;
+    }
+#ifdef CLOX_GC_LOG
+    printf("%p delete ", (void*)obj);
+    value_print(OBJECT_VAL(obj));
+    putchar(10);
+#endif // CLOX_GC_LOG
+    slot = obj; obj = obj->next;
+    if ( prev != NULL ) prev->next = obj;
+    else vm.objects = obj;
+    // *(prev == NULL ? &vm.objects : &prev->next) = obj;
+    object_delete(slot);
+  }
+}
+
+void collect_garbage() {
+#ifdef CLOX_GC_LOG
+  puts("-- gc begin");
+#endif // CLOX_GC_LOG
+  gc_mark_roots();
+  gc_trace_references();
+  gc_table_remove_white(&vm.strings);
+  gc_sweep();
+#ifdef CLOX_GC_LOG
+  puts("-- gc end");
+#endif // CLOX_GC_LOG
 }
 
 #undef READ_CONSTANT

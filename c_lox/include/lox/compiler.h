@@ -92,6 +92,7 @@ void literal(bool);
 void expression();
 void expr_and(bool);
 void patch_jump(int);
+void expr_call(bool);
 void compiler_sync();
 void expr_unary(bool);
 void stmt_statement();
@@ -104,7 +105,7 @@ void stmt_declaration();
 void compiler_advance();
 void expr_grouping(bool);
 void expr_variable(bool);
-void expr_call(bool);
+void gc_mark_compiler_roots();
 bool compiler_match(TokenType);
 ObjectFunction* compiler_delete();
 bool compiler_check(TokenType);
@@ -695,6 +696,16 @@ ObjectFunction* compile(const char* source) {
   compiler_consume(TOKEN_EOF, "Expect end of expression.");
   ObjectFunction* function = compiler_delete();
   return parser.had_error ? NULL : function;
+}
+
+void gc_mark_object(Object *);
+
+void gc_mark_compiler_roots() {
+  Compiler* comp = current;
+  while ( comp != NULL ) {
+    gc_mark_object((Object *)comp->function);
+    comp = comp->enclosing;
+  }
 }
 
 CLOX_END_DECLS

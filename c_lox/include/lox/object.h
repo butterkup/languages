@@ -4,6 +4,7 @@
 #include "common.h"
 #include "chunk.h"
 #include "value.h"
+#include "memory.h"
 
 #define OBJECT_TYPE(value) (AS_OBJECT(value)->type)
 
@@ -35,6 +36,7 @@ typedef enum {
 struct Object {
   ObjectType type;
   Object* next;
+  bool is_marked;
 };
 
 typedef struct {
@@ -87,9 +89,13 @@ bool is_object_type(Value value, ObjectType type) {
 
 Object* allocate_object(size_t size, ObjectType type) {
   Object* object = (Object*)reallocate(NULL, 0, size);
+  object->is_marked = false;
   object->type = type;
   object->next = NULL;
   new_object(object);
+#ifdef CLOX_GC_LOG
+  printf("%p allocate %ld for %d\n", (void *)object, size, type);
+#endif // CLOX_GC_LOG
   return object;
 }
 

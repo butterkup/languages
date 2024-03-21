@@ -1,0 +1,22 @@
+var getter;
+var setter;
+
+fun function() {
+  var store; // the closure that stores the data
+  fun set(val) { store = val; } // write
+  fun get() { return store; }   // read
+  getter = get;
+  setter = set;
+}
+
+// My idea of a generator.
+// fun gen() { if (false) yield; }
+
+// prepare the getters and setters.
+function();
+
+setter("Simon Nganga");
+print getter();
+
+setter("Faith Njeri");
+print getter();

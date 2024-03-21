@@ -27,6 +27,8 @@
 # endif
 #endif
 
+// #define CLOX_GC_STRESS
+// #define CLOX_GC_LOG
 #define UINT8_COUNT (UINT8_MAX + 1)
 // #defin CLOX_VAR_NO_SELF_INIT
 // #define CLOX_AINST_TRACE
