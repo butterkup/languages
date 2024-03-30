@@ -9,7 +9,7 @@ fun grade_score(score) {
     else if (score >= 50) return "D";
     else if (score >= 40) return "E";
     else if (score >= 0) return "F";
-    return "Invalid Score: " + string(score);
+    return "Invalid Score: ";
 }
 
 print grade_score(45);

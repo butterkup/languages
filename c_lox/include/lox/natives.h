@@ -26,8 +26,8 @@ Value exit_native(int arg_count, Value *args) {
 }
 
 void setup_lox_native() {
-  define_native("clock", clock_native);
   define_native("exit", exit_native);
+  define_native("clock", clock_native);
 }
 
 CLOX_END_DECLS

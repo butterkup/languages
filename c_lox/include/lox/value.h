@@ -73,6 +73,7 @@ void value_print(Value value) {
   case VAL_NUMBER: printf("%g", AS_NUMBER(value));             break;
   case VAL_OBJECT: value_oprint(value);                        break;
   case VAL_NIL: printf("nil");                                 break;
+  default: printf("Unknown Value: %d", value.type);            break;
   }
 }
 

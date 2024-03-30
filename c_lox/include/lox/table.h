@@ -137,7 +137,7 @@ void table_print(Table* table) {
   putchar('{');
   for ( ; entry != stop; ++entry )
     if ( entry->key != NULL )
-      entry_print(entry), printf(",\n");
+      entry_print(entry), printf(", ");
   putchar('}');
 }
 

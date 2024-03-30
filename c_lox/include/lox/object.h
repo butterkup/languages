@@ -131,8 +131,8 @@ void value_function_print(ObjectFunction* function) {
 
 void value_oprint(Value value) {
   switch ( OBJECT_TYPE(value) ) {
-  case OBJ_UPVALUE: puts("upvalue");                             break;
-  case OBJ_NATIVE: printf("<native fn>");                        break;
+  case OBJ_UPVALUE: printf("upvalue");                             break;
+  case OBJ_NATIVE: printf("<native fn>");                          break;
   case OBJ_STRING: printf("%s", AS_CSTRING(value));              break;
   case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));   break;
   case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value)); break;
@@ -165,6 +165,7 @@ void object_delete(Object* object) {
     FREE(ObjectClosure, object);                  break;
   case OBJ_UPVALUE:
     FREE(ObjectUpvalue, object);                  break;
+  default: printf("Deleting unknown object: %p\n", object); break;
   }
 }
 

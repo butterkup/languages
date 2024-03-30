@@ -615,7 +615,8 @@ void stmt_return() {
 }
 
 void stmt_statement() {
-  if ( compiler_match(TOKEN_IF) )              stmt_if();
+  if ( compiler_match(TOKEN_SEMICOLON) ); // Empty statement
+  else if ( compiler_match(TOKEN_IF) )         stmt_if();
   else if ( compiler_match(TOKEN_FOR) )        stmt_for();
   else if ( compiler_match(TOKEN_PRINT) )      stmt_print();
   else if ( compiler_match(TOKEN_WHILE) )      stmt_while();
