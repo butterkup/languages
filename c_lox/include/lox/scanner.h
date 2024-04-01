@@ -159,12 +159,13 @@ Token identifier() {
 Token scan();
 
 bool _consume_multiline_comment() {
-  for ( ;;)
-    if ( is_at_end() ) return false;
-    else switch ( advance() ) {
+  while (!is_at_end()) switch(peek()) {
+    case '*': if ((advance(), match('/')))
+      return true;
     case '\n': scanner.line++;
-    case '*': if ( match('/') ) return true;
-    }
+    default: advance();
+  }
+  return false;
 }
 
 void _consume_oneline_comment() {

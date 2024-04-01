@@ -25,6 +25,8 @@ typedef struct {
   } payload;
 } Value;
 
+Value stack_pop();
+void stack_push(Value);
 
 #define IS_NIL(value) ((value).type == VAL_NIL)
 #define IS_BOOL(value) ((value).type == VAL_BOOL)
@@ -56,13 +58,14 @@ void value_delete(ValueArray* array) {
 }
 
 void value_append(ValueArray* array, Value value) {
+  stack_push(value);
   if ( array->capacity < array->count + 1 ) {
     int capacity = array->capacity;
     array->capacity = GROW_CAPACITY(capacity);
     array->values = GROW_ARRAY(Value, array->values, capacity, array->capacity);
   }
-  array->values[array->count] = value;
-  array->count++;
+  stack_pop();
+  array->values[array->count++] = value;
 }
 
 void value_oprint(Value object);

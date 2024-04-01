@@ -688,6 +688,7 @@ ObjectFunction* compiler_delete() {
 }
 
 ObjectFunction* compile(const char* source) {
+  // puts("----------------- 'COMPILER_START' ---------------");
   Compiler compiler;
   compiler_init();
   comp_init(&compiler, TYPE_SCRIPT);
@@ -696,6 +697,7 @@ ObjectFunction* compile(const char* source) {
   while ( !compiler_match(TOKEN_EOF) ) stmt_declaration();
   compiler_consume(TOKEN_EOF, "Expect end of expression.");
   ObjectFunction* function = compiler_delete();
+  // puts("----------------- 'COMPILER_END' -----------------");
   return parser.had_error ? NULL : function;
 }
 

@@ -13,7 +13,8 @@
 #define IS_CLOSURE(value)  is_object_type(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) is_object_type(value, OBJ_FUNCTION)
 
-#define AS_NATIVE(value)   ((ObjectNative *)AS_OBJECT(value))->function
+#define AS_NATIVE_OBJ(value)   (ObjectNative *)AS_OBJECT(value)
+#define AS_NATIVE(value) (AS_NATIVE_OBJ(value))->function
 #define AS_STRING(value)   ((ObjectString *)AS_OBJECT(value))
 #define AS_CSTRING(value)  (AS_STRING(value))->chars
 #define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
@@ -23,7 +24,7 @@
 #define ALLOCATE_OBJECT(Type, ObjectType) \
   (Type *)allocate_object(sizeof(Type), ObjectType)
 
-uint32_t hash_string(const char*, int);
+uint64_t hash_string(const char*, int);
 
 typedef enum {
   OBJ_STRING,
@@ -32,6 +33,23 @@ typedef enum {
   OBJ_CLOSURE,
   OBJ_UPVALUE
 } ObjectType;
+
+#define _STR(value) #value
+#define CSOT(type) case OBJ_##type: return _STR(OBJECT_##type)
+
+const char *strobjtype(ObjectType type) {
+  switch (type) {
+    CSOT(STRING);
+    CSOT(FUNCTION);
+    CSOT(NATIVE);
+    CSOT(CLOSURE);
+    CSOT(UPVALUE);
+    default: "<UnknownObjectType>";
+  }
+}
+
+#undef CSOT
+#undef _STR
 
 struct Object {
   ObjectType type;
@@ -42,7 +60,7 @@ struct Object {
 typedef struct {
   Object object;
   char* chars;
-  uint32_t hash;
+  uint64_t hash;
   int length;
 } ObjectString;
 
@@ -58,6 +76,7 @@ typedef Value(*NativeFn)(int, Value*);
 
 typedef struct {
   Object object;
+  const char* name;
   NativeFn function;
 } ObjectNative;
 
@@ -65,7 +84,7 @@ typedef struct ObjectUpvalue {
   Object object;
   Value* location;
   Value closed;
-  struct ObjectUpvalue *next;
+  struct ObjectUpvalue* next;
 } ObjectUpvalue;
 
 typedef struct {
@@ -79,9 +98,9 @@ void new_object(Object*);
 ObjectUpvalue* new_upvalue(Value*);
 ObjectClosure* new_closure(ObjectFunction*);
 ObjectFunction* new_function();
-ObjectNative* new_native(NativeFn);
-bool intern_string(ObjectString*);
-ObjectString* table_find_istring(char*, int, uint32_t);
+ObjectNative* new_native(NativeFn, const char*);
+void intern_string(ObjectString*);
+ObjectString* table_find_istring(const char*, int, uint64_t);
 
 bool is_object_type(Value value, ObjectType type) {
   return IS_OBJECT(value) && OBJECT_TYPE(value) == type;
@@ -94,34 +113,45 @@ Object* allocate_object(size_t size, ObjectType type) {
   object->next = NULL;
   new_object(object);
 #ifdef CLOX_GC_LOG
-  printf("%p allocate %ld for %d\n", (void *)object, size, type);
+  printf("%p allocate %ld for %s\n", (void*)object, size, strobjtype(type));
 #endif // CLOX_GC_LOG
   return object;
 }
 
-ObjectNative* new_native(NativeFn function) {
+ObjectNative* new_native(NativeFn function, const char* name) {
   ObjectNative* native = ALLOCATE_OBJECT(ObjectNative, OBJ_NATIVE);
   native->function = function;
+  native->name = name;
   return native;
 }
 
-ObjectString* allocate_string(char* payload, int size, uint32_t hash) {
-  ObjectString* string = table_find_istring(payload, size, hash);
-  if ( string != NULL ) return string;
-  string = ALLOCATE_OBJECT(ObjectString, OBJ_STRING);
+ObjectString* allocate_string_noi(char* payload, int size, uint64_t hash) {
+  ObjectString* string = ALLOCATE_OBJECT(ObjectString, OBJ_STRING);
   string->chars = payload;
   string->length = size;
   string->hash = hash;
+  return string;
+}
+
+ObjectString* allocate_string(char *payload, int size, uint64_t hash) {
+  ObjectString *string = table_find_istring(payload, size, hash);
+  if (string) {
+    FREE_ARRAY(char, payload, size);
+    return string;
+  }
+  string = allocate_string_noi(payload, size, hash);
   intern_string(string);
   return string;
 }
 
 ObjectString* copy_string(const char* chars, int size) {
-  uint32_t hash = hash_string(chars, size);
+  uint64_t hash = hash_string(chars, size);
   char* payload = ALLOCATE(char, size + 1);
   memcpy(payload, chars, size);
   payload[size] = '\0';
-  return allocate_string(payload, size, hash);
+  ObjectString *str = allocate_string(payload, size, hash);
+  // printf("Copying[%p]: \"%.*s\"\n", str, size, chars);
+  return str;
 }
 
 void value_function_print(ObjectFunction* function) {
@@ -130,13 +160,17 @@ void value_function_print(ObjectFunction* function) {
 }
 
 void value_oprint(Value value) {
+  if (!value.payload.object) {
+    printf("(NULL OBJECT)");
+    return;
+  }
   switch ( OBJECT_TYPE(value) ) {
-  case OBJ_UPVALUE: printf("upvalue");                             break;
-  case OBJ_NATIVE: printf("<native fn>");                          break;
-  case OBJ_STRING: printf("%s", AS_CSTRING(value));              break;
-  case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));   break;
-  case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value)); break;
-  default: printf("Unknown object: %d", OBJECT_TYPE(value));     break;
+  case OBJ_UPVALUE: printf("upvalue");                                       break;
+  case OBJ_NATIVE: printf("<native fn(%s)>", (AS_NATIVE_OBJ(value))->name);  break;
+  case OBJ_STRING: printf("%s", AS_CSTRING(value));                          break;
+  case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));               break;
+  case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value));             break;
+  default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value));                 break;
   }
 }
 

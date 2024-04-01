@@ -61,16 +61,14 @@ typedef enum {
 
 Vm vm;
 
+ObjectString* take_string(char*, int);
+
 void stack_push(Value value) {
   *vm.stack_top = value;
   vm.stack_top++;
 }
 
-bool intern_string(ObjectString* string) {
-  return table_set(&vm.strings, string, NIL_VAL);
-}
-
-ObjectString* table_find_istring(char* payload, int size, uint32_t hash) {
+ObjectString* table_find_istring(const char* payload, int size, uint64_t hash) {
   return table_find_string(&vm.strings, payload, size, hash);
 }
 
@@ -110,9 +108,11 @@ void runtime_error(const char* format, ...) {
 }
 
 void define_native(const char* name, NativeFn function) {
-  stack_push(OBJECT_VAL(copy_string(name, (int)strlen(name))));
-  stack_push(OBJECT_VAL(new_native(function)));
-  table_set(&vm.globals, AS_STRING(stack_peek(0)), stack_peek(1));
+  stack_push(OBJECT_VAL(copy_string(name, strlen(name))));
+  stack_push(OBJECT_VAL(new_native(function, name)));
+  ObjectString* str = AS_STRING(stack_peek(1));
+  // printf("String['%s']: %p\n", str->chars, str);
+  table_set(&vm.globals, AS_STRING(stack_peek(1)), stack_peek(0));
   stack_pop();
   stack_pop();
 }
@@ -137,7 +137,7 @@ bool values_equal(Value a, Value b) {
 }
 
 ObjectString* take_string(char* chars, int length) {
-  uint32_t hash = hash_string(chars, length);
+  uint64_t hash = hash_string(chars, length);
   ObjectString* string = table_find_string(&vm.strings, chars, length, hash);
   if ( string != NULL ) {
     FREE_ARRAY(char, chars, length + 1);
@@ -283,8 +283,10 @@ InterpretResult run() {
     case OP_GET_GLOBAL: {
       ObjectString* name = READ_STRING();
       Value value;
+      // printf("String['%s']: %p\n", name->chars, name);
       if ( !table_get(&vm.globals, name, &value) ) {
         table_print(&vm.globals);
+        putchar(10);
         runtime_error("[Getter] Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       } stack_push(value);                                                    break;
@@ -438,8 +440,16 @@ void vm_init() {
   setup_lox_native();
 }
 
-void vm_intern_string(ObjectString* string) {
+void intern_string(ObjectString* string) {
+  stack_push(OBJECT_VAL(string));
   table_set(&vm.strings, string, NIL_VAL);
+  stack_pop();
+  // printf("Interns: ");
+  // for ( int idx = 0; idx < vm.strings.capacity; idx++ ) {
+  //   Entry* e = vm.strings.entries + idx;
+  //   if ( e->key ) printf("\"%.*s\" ", e->key->length, e->key->chars);
+  // }
+  // putchar(10);
 }
 
 void vm_delete() {
@@ -452,7 +462,7 @@ void vm_delete() {
 // GARBAGE COLLECTOR LIVES HERE: POOR CODE STRUCTURE.
 
 void gc_mark_object(Object* object) {
-  if ( object == NULL ) return;
+  if ( !object ) return;
   if ( object->is_marked ) return;
 #ifdef CLOX_GC_LOG
   printf("%p mark ", (void*)object);
@@ -468,23 +478,23 @@ void gc_mark_object(Object* object) {
   vm.gray_stack[vm.gray_count++] = object;
 }
 
-void gc_mark_value(Value* value) {
-  if ( !IS_OBJECT(*value) ) return;
-  gc_mark_object(AS_OBJECT(*value));
+void gc_mark_value(Value value) {
+  if ( !IS_OBJECT(value) ) return;
+  gc_mark_object(AS_OBJECT(value));
 }
 
 void gc_mark_table(Table* table) {
   Entry* entry;
   for ( int i = 0; i < table->capacity; ++i ) {
-    entry = &table->entries[i];
+    entry = table->entries + i;
     gc_mark_object((Object*)entry->key);
-    gc_mark_value(&entry->value);
+    gc_mark_value(entry->value);
   }
 }
 
 void gc_mark_roots() {
   for ( Value* slot = vm.stack; slot < vm.stack_top; ++slot )
-    gc_mark_value(slot);
+    gc_mark_value(*slot);
   for ( int i = 0; i < vm.frame_count; ++i )
     gc_mark_object((Object*)vm.frames[i].closure);
   for ( ObjectUpvalue* upv = vm.open_upvalues; upv != NULL; upv = upv->next )
@@ -495,7 +505,7 @@ void gc_mark_roots() {
 
 void gc_mark_array(ValueArray* array) {
   for ( int i = 0; i < array->count; ++i )
-    gc_mark_value(array->values + i);
+    gc_mark_value(array->values[i]);
 }
 
 void gc_blacken_object(Object* object) {
@@ -507,7 +517,7 @@ void gc_blacken_object(Object* object) {
   switch ( object->type ) {
   case OBJ_NATIVE:
   case OBJ_STRING:                                                    break;
-  case OBJ_UPVALUE: gc_mark_value(&((ObjectUpvalue*)object)->closed); break;
+  case OBJ_UPVALUE: gc_mark_value(((ObjectUpvalue*)object)->closed); break;
   case OBJ_FUNCTION: {
     ObjectFunction* func = (ObjectFunction*)object;
     gc_mark_object((Object*)func->name);
@@ -525,8 +535,8 @@ void gc_blacken_object(Object* object) {
 void gc_table_remove_white(Table* table) {
   Entry* entry;
   for ( int i = 0; i < table->capacity; ++i ) {
-    entry = &table->entries[i];
-    if ( entry->key != NULL && !entry->key->object.is_marked )
+    entry = table->entries + i;
+    if ( entry->key && !entry->key->object.is_marked )
       table_del(table, entry->key);
   }
 }
@@ -538,7 +548,7 @@ void gc_trace_references() {
 
 void gc_sweep() {
   Object* prev = NULL, * obj = vm.objects, * slot;
-  while ( obj != NULL ) {
+  while ( obj ) {
     if ( obj->is_marked ) {
       obj->is_marked = false;
       prev = obj; obj = obj->next;
@@ -550,9 +560,8 @@ void gc_sweep() {
     putchar(10);
 #endif // CLOX_GC_LOG
     slot = obj; obj = obj->next;
-    // if ( prev != NULL ) prev->next = obj;
-    // else vm.objects = obj;
-    *(prev == NULL ? &vm.objects : &prev->next) = obj;
+    if ( prev ) prev->next = obj;
+    else vm.objects = obj;
     object_delete(slot);
   }
 }

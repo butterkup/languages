@@ -1,4 +1,4 @@
-CC=gcc -std=c2x
+CC=gcc -std=c2x -O1
 IPATH=./include
 
 all: install

@@ -18,7 +18,7 @@ Value clock_native(int arg_count, Value* args) {
 
 Value exit_native(int arg_count, Value *args) {
   if (arg_count > 1)
-    runtime_error("exit expected integer argument, got %d argument(s).", arg_count);
+    runtime_error("exit expected one integer argument, got %d argument(s).", arg_count);
   if (arg_count == 0) exit(0);
   else if (IS_NUMBER(*args)) exit(AS_NUMBER(*args));
   else runtime_error("Expected an integer exit code.");

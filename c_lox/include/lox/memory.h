@@ -6,7 +6,7 @@
 CLOX_BEG_DECLS
 
 #define GROW_CAPACITY(capacity) \
-  (capacity < 8? 8 : capacity * 2)
+  (capacity < 5? 5 : capacity * 2)
 
 #define GROW_ARRAY(type, begptr, oldcap, capacity) \
   (type*)reallocate(begptr, sizeof(type) * oldcap, sizeof(type) * capacity)

@@ -45,7 +45,7 @@ class Env(_nativefn):
     def arity(self) -> int:
         return 0
 
-    def call(self, visitor: StmtVisitor, _):
+    def call(self, visitor: StmtVisitor, args: list[object]):
         env = visitor.env  # type: ignore
         cnt = 0
         while env is not None:
