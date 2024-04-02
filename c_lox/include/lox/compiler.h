@@ -90,6 +90,7 @@ void stmt_var();
 void expr_or(bool);
 void literal(bool);
 void expression();
+void expr_dot(bool);
 void expr_and(bool);
 void patch_jump(int);
 void expr_call(bool);
@@ -103,10 +104,12 @@ void expr_string(bool);
 void emit_byte(uint8_t);
 void stmt_declaration();
 void compiler_advance();
+void emit_byte(uint8_t);
 void expr_grouping(bool);
 void expr_variable(bool);
 void gc_mark_compiler_roots();
 bool compiler_match(TokenType);
+void emit_bytes(uint8_t, uint8_t);
 ObjectFunction* compiler_delete();
 bool compiler_check(TokenType);
 uint8_t identifier_constant(Token*);
@@ -121,7 +124,7 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_LEFT_BRACE,       NULL,               NULL,           _NONE),
   TKPREC_RULE(_RIGHT_BRACE,      NULL,               NULL,           _NONE),
   TKPREC_RULE(_COMMA,            NULL,               NULL,           _NONE),
-  TKPREC_RULE(_DOT,              NULL,               NULL,           _NONE),
+  TKPREC_RULE(_DOT,              NULL,               expr_dot,       _CALL),
   TKPREC_RULE(_MINUS,            expr_unary,         expr_binary,    _TERM),
   TKPREC_RULE(_PLUS,             NULL,               expr_binary,    _TERM),
   TKPREC_RULE(_SEMICOLON,        NULL,               NULL,           _NONE),
@@ -201,6 +204,15 @@ void expr_or(bool) {
   emit_byte(OP_POP);
   parse_precedence(PREC_OR);
   patch_jump(jump_end);
+}
+
+void expr_dot(bool can_assign) {
+  compiler_consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+  uint8_t property = identifier_constant(&parser.previous);
+  if (can_assign && compiler_match(TOKEN_EQUAL)) {
+  expression();
+    emit_bytes(OP_SET_PROPERTY, property);
+  } else emit_bytes(OP_GET_PROPERTY, property);
 }
 
 void compiler_sync() {
@@ -667,12 +679,22 @@ void stmt_fun() {
   define_variable(global);
 }
 
+void stmt_class() {
+  compiler_consume(TOKEN_IDENTIFIER, "Expect class name.");
+  uint8_t name_constant = identifier_constant(&parser.previous);
+  declare_variable();
+  emit_bytes(OP_CLASS, name_constant);
+  define_variable(name_constant);
+  compiler_consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+}
+
 void stmt_declaration() {
-  if ( compiler_match(TOKEN_VAR) ) stmt_var();
-  else if ( compiler_match(TOKEN_FUN) ) stmt_fun();
+  if ( compiler_match(TOKEN_VAR) )        stmt_var();
+  else if ( compiler_match(TOKEN_FUN) )   stmt_fun();
+  else if ( compiler_match(TOKEN_CLASS) ) stmt_class();
   else stmt_statement();
-  if ( parser.panic_mode )
-    compiler_sync();
+  if ( parser.panic_mode ) compiler_sync();
 }
 
 void compiler_init() {

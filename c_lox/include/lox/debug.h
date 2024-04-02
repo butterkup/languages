@@ -52,9 +52,12 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   case OP_JUMP:          return jump_instruction(chunk, 1, offset);
   case OP_JUMP_IF_FALSE: return jump_instruction(chunk, 1, offset);
   case OP_LOOP:          return jump_instruction(chunk, -1, offset);
+  case OP_CLASS:         return constant_instruction(chunk, offset);
   case OP_CONSTANT:      return constant_instruction(chunk, offset);
   case OP_SET_GLOBAL:    return constant_instruction(chunk, offset);
   case OP_GET_GLOBAL:    return constant_instruction(chunk, offset);
+  case OP_SET_PROPERTY:  return constant_instruction(chunk, offset);
+  case OP_GET_PROPERTY:  return constant_instruction(chunk, offset);
   case OP_DEFINE_GLOBAL: return constant_instruction(chunk, offset);
   case OP_CLOSURE: {
     uint8_t constant = chunk->code[++offset];

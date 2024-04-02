@@ -11,6 +11,8 @@ typedef enum {
   OP_CLOSE_UPVALUE,
   OP_JUMP_IF_FALSE,
   OP_DEFINE_GLOBAL,
+  OP_SET_PROPERTY,
+  OP_GET_PROPERTY,
   OP_SET_UPVALUE,
   OP_GET_UPVALUE,
   OP_SET_GLOBAL,
@@ -28,6 +30,7 @@ typedef enum {
   OP_FALSE,
   OP_EQUAL,
   OP_PRINT,
+  OP_CLASS,
   OP_TRUE,
   OP_LESS,
   OP_JUMP,
@@ -47,6 +50,8 @@ const char *inst_print(uint8_t byte) {
   INSTCS(_CLOSE_UPVALUE);
   INSTCS(_JUMP_IF_FALSE);
   INSTCS(_DEFINE_GLOBAL);
+  INSTCS(_SET_PROPERTY);
+  INSTCS(_GET_PROPERTY);
   INSTCS(_SET_UPVALUE);
   INSTCS(_GET_UPVALUE);
   INSTCS(_SET_GLOBAL);
@@ -64,6 +69,7 @@ const char *inst_print(uint8_t byte) {
   INSTCS(_FALSE);
   INSTCS(_EQUAL);
   INSTCS(_PRINT);
+  INSTCS(_CLASS);
   INSTCS(_TRUE);
   INSTCS(_LESS);
   INSTCS(_JUMP);

@@ -1,0 +1,33 @@
+print "Testing C-Lox OOP";
+
+class Cake { }
+class Pie { }
+
+var berry_pie = Pie();
+berry_pie.flavor = "Orange";
+var queen_cake = Cake();
+queen_cake.color = "Green";
+
+print berry_pie;
+print berry_pie.flavor;
+print queen_cake;
+print queen_cake.color;
+
+berry_pie = 45;
+queen_cake = 55;
+
+print berry_pie + queen_cake;
+
+berry_pie = Pie();
+
+print berry_pie;
+
+print Cake();
+
+Pie = "Pie";
+
+print Pie;
+
+berry_pie = "I am eating a " + Pie;
+
+print berry_pie;

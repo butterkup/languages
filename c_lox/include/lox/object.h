@@ -8,17 +8,21 @@
 
 #define OBJECT_TYPE(value) (AS_OBJECT(value)->type)
 
-#define IS_STRING(value)   is_object_type(value, OBJ_STRING)
-#define IS_NATIVE(value)   is_object_type(value, OBJ_NATIVE)
-#define IS_CLOSURE(value)  is_object_type(value, OBJ_CLOSURE)
-#define IS_FUNCTION(value) is_object_type(value, OBJ_FUNCTION)
+#define IS_STRING(value)     is_object_type(value, OBJ_STRING)
+#define IS_NATIVE(value)     is_object_type(value, OBJ_NATIVE)
+#define IS_CLOSURE(value)    is_object_type(value, OBJ_CLOSURE)
+#define IS_FUNCTION(value)   is_object_type(value, OBJ_FUNCTION)
+#define IS_CLASS(value)      is_object_type(value, OBJ_CLASS)
+#define IS_INSTANCE(value)   is_object_type(value, OBJ_INSTANCE)
 
-#define AS_NATIVE_OBJ(value)   (ObjectNative *)AS_OBJECT(value)
-#define AS_NATIVE(value) (AS_NATIVE_OBJ(value))->function
-#define AS_STRING(value)   ((ObjectString *)AS_OBJECT(value))
-#define AS_CSTRING(value)  (AS_STRING(value))->chars
-#define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
-#define AS_CLOSURE(value)  ((ObjectClosure *)AS_OBJECT(value))
+#define AS_NATIVE_OBJ(value) ((ObjectNative *)AS_OBJECT(value))
+#define AS_NATIVE(value)     AS_NATIVE_OBJ(value)->function
+#define AS_STRING(value)     ((ObjectString *)AS_OBJECT(value))
+#define AS_CSTRING(value)    (AS_STRING(value))->chars
+#define AS_FUNCTION(value)   ((ObjectFunction *)AS_OBJECT(value))
+#define AS_CLOSURE(value)    ((ObjectClosure *)AS_OBJECT(value))
+#define AS_CLASS(value)      ((ObjectClass *)AS_OBJECT(value))
+#define AS_INSTANCE(value)   ((ObjectInstance *)AS_OBJECT(value))
 #define UNWRAP_CLOSURE(value) (AS_CLOSURE(value))->function
 
 #define ALLOCATE_OBJECT(Type, ObjectType) \
@@ -31,20 +35,24 @@ typedef enum {
   OBJ_FUNCTION,
   OBJ_NATIVE,
   OBJ_CLOSURE,
-  OBJ_UPVALUE
+  OBJ_UPVALUE,
+  OBJ_CLASS,
+  OBJ_INSTANCE
 } ObjectType;
 
 #define _STR(value) #value
 #define CSOT(type) case OBJ_##type: return _STR(OBJECT_##type)
 
-const char *strobjtype(ObjectType type) {
-  switch (type) {
+const char* strobjtype(ObjectType type) {
+  switch ( type ) {
     CSOT(STRING);
     CSOT(FUNCTION);
     CSOT(NATIVE);
     CSOT(CLOSURE);
     CSOT(UPVALUE);
-    default: "<UnknownObjectType>";
+    CSOT(CLASS);
+    CSOT(INSTANCE);
+  default: "<UnknownObjectType>";
   }
 }
 
@@ -94,7 +102,22 @@ typedef struct {
   int upvalue_count;
 } ObjectClosure;
 
+typedef struct {
+  Object object;
+  ObjectString* name;
+} ObjectClass;
+
+#include "table.h"
+
+typedef struct {
+  Object object;
+  ObjectClass* klass;
+  Table fields;
+} ObjectInstance;
+
 void new_object(Object*);
+ObjectInstance* new_instance(ObjectClass*);
+ObjectClass* new_class(ObjectString*);
 ObjectUpvalue* new_upvalue(Value*);
 ObjectClosure* new_closure(ObjectFunction*);
 ObjectFunction* new_function();
@@ -125,6 +148,19 @@ ObjectNative* new_native(NativeFn function, const char* name) {
   return native;
 }
 
+ObjectClass* new_class(ObjectString* klass_name) {
+  ObjectClass* klass = ALLOCATE_OBJECT(ObjectClass, OBJ_CLASS);
+  klass->name = klass_name;
+  return klass;
+}
+
+ObjectInstance* new_instance(ObjectClass* klass) {
+  ObjectInstance* instance = ALLOCATE_OBJECT(ObjectInstance, OBJ_INSTANCE);
+  table_init(&instance->fields);
+  instance->klass = klass;
+  return instance;
+}
+
 ObjectString* allocate_string_noi(char* payload, int size, uint64_t hash) {
   ObjectString* string = ALLOCATE_OBJECT(ObjectString, OBJ_STRING);
   string->chars = payload;
@@ -133,9 +169,9 @@ ObjectString* allocate_string_noi(char* payload, int size, uint64_t hash) {
   return string;
 }
 
-ObjectString* allocate_string(char *payload, int size, uint64_t hash) {
-  ObjectString *string = table_find_istring(payload, size, hash);
-  if (string) {
+ObjectString* allocate_string(char* payload, int size, uint64_t hash) {
+  ObjectString* string = table_find_istring(payload, size, hash);
+  if ( string ) {
     FREE_ARRAY(char, payload, size);
     return string;
   }
@@ -149,7 +185,7 @@ ObjectString* copy_string(const char* chars, int size) {
   char* payload = ALLOCATE(char, size + 1);
   memcpy(payload, chars, size);
   payload[size] = '\0';
-  ObjectString *str = allocate_string(payload, size, hash);
+  ObjectString* str = allocate_string(payload, size, hash);
   // printf("Copying[%p]: \"%.*s\"\n", str, size, chars);
   return str;
 }
@@ -160,17 +196,19 @@ void value_function_print(ObjectFunction* function) {
 }
 
 void value_oprint(Value value) {
-  if (!value.payload.object) {
+  if ( !value.payload.object ) {
     printf("(NULL OBJECT)");
     return;
   }
   switch ( OBJECT_TYPE(value) ) {
-  case OBJ_UPVALUE: printf("upvalue");                                       break;
-  case OBJ_NATIVE: printf("<native fn(%s)>", (AS_NATIVE_OBJ(value))->name);  break;
-  case OBJ_STRING: printf("%s", AS_CSTRING(value));                          break;
-  case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));               break;
-  case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value));             break;
-  default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value));                 break;
+  case OBJ_UPVALUE: printf("upvalue");                                                 break;
+  case OBJ_NATIVE: printf("<native fn(%s)>", AS_NATIVE_OBJ(value)->name);              break;
+  case OBJ_STRING: printf("%s", AS_CSTRING(value));                                    break;
+  case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));                         break;
+  case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value));                       break;
+  case OBJ_CLASS: printf("<class %s>", AS_CLASS(value)->name->chars);                  break;
+  case OBJ_INSTANCE: printf("<%s instance>", AS_INSTANCE(value)->klass->name->chars);  break;
+  default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value)); break;
   }
 }
 
@@ -184,21 +222,26 @@ void object_delete(Object* object) {
   case OBJ_STRING: {
     ObjectString* string = (ObjectString*)object;
     FREE_ARRAY(char, string->chars, string->length + 1);
-    FREE(ObjectString, object);                   break;
+    FREE(ObjectString, object);                             break;
   }
   case OBJ_FUNCTION:
     chunk_delete(&((ObjectFunction*)object)->chunk);
-    FREE(ObjectFunction, object);                 break;
+    FREE(ObjectFunction, object);                           break;
   case OBJ_NATIVE:
-    FREE(ObjectNative, object);                   break;
+    FREE(ObjectNative, object);                             break;
   case OBJ_CLOSURE:
     FREE_ARRAY(ObjectUpvalue*,
       ((ObjectClosure*)object)->upvalues,
       ((ObjectClosure*)object)->upvalue_count
     );
-    FREE(ObjectClosure, object);                  break;
+    FREE(ObjectClosure, object);                            break;
   case OBJ_UPVALUE:
-    FREE(ObjectUpvalue, object);                  break;
+    FREE(ObjectUpvalue, object);                            break;
+  case OBJ_CLASS:
+    FREE(ObjectClass, object);                              break;
+  case OBJ_INSTANCE:
+    table_delete(&((ObjectInstance*)object)->fields);
+    FREE(ObjectInstance, object);                           break;
   default: printf("Deleting unknown object: %p\n", object); break;
   }
 }

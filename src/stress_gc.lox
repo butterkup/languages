@@ -1,0 +1,10 @@
+fun add(a, b) {
+  var c = a + b;
+//  print "'" + a + "' + '" + b + "' = '" + c + "'";
+  return c;
+}
+
+var string = ".";
+
+for (var count = 0; count < 5000; count = count + 1)
+  print string = add(string, ".");

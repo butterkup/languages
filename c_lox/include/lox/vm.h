@@ -121,7 +121,7 @@ bool is_false(Value value) {
   return IS_NIL(value) ||
     ((IS_NUMBER(value)) && AS_NUMBER(value) == 0) ||
     ((IS_STRING(value)) && (AS_STRING(value))->length == 0) ||
-    ((IS_BOOL(value)) && AS_BOOL(value) == false);
+    ((IS_BOOL(value)) && AS_BOOL(value) == false) || true;
 }
 
 bool values_equal(Value a, Value b) {
@@ -190,6 +190,11 @@ bool call_value(Value callee, int arg_count) {
     vm.stack_top -= arg_count;
     stack_push(result); return true;
   }
+  case OBJ_CLASS: {
+    ObjectClass* klass = AS_CLASS(callee);
+    vm.stack_top[-arg_count - 1] = OBJECT_VAL(new_instance(klass));
+    return true;
+  }
   }
   runtime_error("Can only call functions and classes.");
   return false;
@@ -243,6 +248,33 @@ InterpretResult run() {
     case OP_JUMP:          VMIP() += READ_SHORT();                            break;
     case OP_LOOP:          VMIP() -= READ_SHORT();                            break;
     case OP_CLOSE_UPVALUE: close_upvalues(vm.stack_top - 1); stack_pop();     break;
+    case OP_CLASS: stack_push(OBJECT_VAL(new_class(READ_STRING())));          break;
+    case OP_SET_PROPERTY: {
+      if (!IS_INSTANCE(stack_peek(1))) {
+        runtime_error("Only instances have fields.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      ObjectInstance* instance = AS_INSTANCE(stack_peek(1));
+      table_set(&instance->fields, READ_STRING(), stack_peek(0));
+      Value value = stack_pop();
+      stack_pop(); // Instance
+      stack_push(value);                                                      break;
+    }
+    case OP_GET_PROPERTY: {
+      if (!IS_INSTANCE(stack_peek(0))) {
+        runtime_error("Only instances have properties.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      ObjectInstance* instance = AS_INSTANCE(stack_peek(0));
+      ObjectString* property = READ_STRING();
+      Value value;
+      if (table_get(&instance->fields, property, &value)) {
+        stack_pop(); // Instance
+        stack_push(value);                                                    break;
+      }
+      runtime_error("Undefined property '%s'.", property->chars);
+      return INTERPRET_RUNTIME_ERROR;
+    }
     case OP_RETURN: {
       Value result = stack_pop();
       close_upvalues(TOP_FRAME()->slots);
@@ -516,7 +548,7 @@ void gc_blacken_object(Object* object) {
 #endif // CLOX_GC_LOG
   switch ( object->type ) {
   case OBJ_NATIVE:
-  case OBJ_STRING:                                                    break;
+  case OBJ_STRING:                                                   break;
   case OBJ_UPVALUE: gc_mark_value(((ObjectUpvalue*)object)->closed); break;
   case OBJ_FUNCTION: {
     ObjectFunction* func = (ObjectFunction*)object;
@@ -528,6 +560,15 @@ void gc_blacken_object(Object* object) {
     gc_mark_object((Object*)closure->function);
     for ( int i = 0; i < closure->upvalue_count; ++i )
       gc_mark_object((Object*)closure->upvalues[i]);                 break;
+  }
+  case OBJ_CLASS: {
+    ObjectClass* klass = (ObjectClass*)object;
+    gc_mark_object((Object*)klass->name);                            break;
+  }
+  case OBJ_INSTANCE: {
+    ObjectInstance* instance = (ObjectInstance*)object;
+    gc_mark_object((Object*)instance->klass);
+    gc_mark_table(&instance->fields);
   }
   }
 }
