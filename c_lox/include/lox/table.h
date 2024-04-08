@@ -42,11 +42,8 @@ uint64_t fnv1a_algo(const char* chars, int length) {
 
 uint64_t my_hash(const char* chars, int length) {
   uint64_t hash = length;
-  // printf("Hashing: \"%.*s\"\n", length, chars);
-  for ( int idx = 0; idx < length; ++idx ) {
-    // printf(" hash: %u\n", hash);
+  for ( int idx = 0; idx < length; ++idx )
     hash *= (hash << 1) ^ chars[idx];
-  }
   return hash;
 }
 
@@ -62,7 +59,11 @@ Entry* entry_find(Entry* const entries, int cap, ObjectString* const key) {
   Entry* tombstone = NULL, * entry = entries + idx;
   for ( ;; idx = (idx + 1) % cap, entry = entries + idx )
     if ( entry->key == key ) return entry;
-    else if (entry->key && !memcmp(key->chars, entry->key->chars, key->length)) return entry;
+    else if (
+      entry->key &&
+      key->length == entry->key->length &&
+      !memcmp(key->chars, entry->key->chars, key->length)
+      ) return entry;
     else if ( entry->key == NULL )
       if ( IS_NIL(entry->value) )
         return tombstone ? tombstone : entry;

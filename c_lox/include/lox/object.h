@@ -8,22 +8,24 @@
 
 #define OBJECT_TYPE(value) (AS_OBJECT(value)->type)
 
-#define IS_STRING(value)     is_object_type(value, OBJ_STRING)
-#define IS_NATIVE(value)     is_object_type(value, OBJ_NATIVE)
-#define IS_CLOSURE(value)    is_object_type(value, OBJ_CLOSURE)
-#define IS_FUNCTION(value)   is_object_type(value, OBJ_FUNCTION)
-#define IS_CLASS(value)      is_object_type(value, OBJ_CLASS)
-#define IS_INSTANCE(value)   is_object_type(value, OBJ_INSTANCE)
+#define IS_CLASS(value)        is_object_type(value, OBJ_CLASS)
+#define IS_STRING(value)       is_object_type(value, OBJ_STRING)
+#define IS_NATIVE(value)       is_object_type(value, OBJ_NATIVE)
+#define IS_CLOSURE(value)      is_object_type(value, OBJ_CLOSURE)
+#define IS_FUNCTION(value)     is_object_type(value, OBJ_FUNCTION)
+#define IS_INSTANCE(value)     is_object_type(value, OBJ_INSTANCE)
+#define IS_BOUND_METHOD(value) is_object_type(value, OBJ_BOUND_METHOD)
 
-#define AS_NATIVE_OBJ(value) ((ObjectNative *)AS_OBJECT(value))
-#define AS_NATIVE(value)     AS_NATIVE_OBJ(value)->function
-#define AS_STRING(value)     ((ObjectString *)AS_OBJECT(value))
-#define AS_CSTRING(value)    (AS_STRING(value))->chars
-#define AS_FUNCTION(value)   ((ObjectFunction *)AS_OBJECT(value))
-#define AS_CLOSURE(value)    ((ObjectClosure *)AS_OBJECT(value))
-#define AS_CLASS(value)      ((ObjectClass *)AS_OBJECT(value))
-#define AS_INSTANCE(value)   ((ObjectInstance *)AS_OBJECT(value))
-#define UNWRAP_CLOSURE(value) (AS_CLOSURE(value))->function
+#define AS_NATIVE_OBJ(value)   ((ObjectNative *)AS_OBJECT(value))
+#define AS_NATIVE(value)       AS_NATIVE_OBJ(value)->function
+#define AS_STRING(value)       ((ObjectString *)AS_OBJECT(value))
+#define AS_CSTRING(value)      (AS_STRING(value))->chars
+#define AS_FUNCTION(value)     ((ObjectFunction *)AS_OBJECT(value))
+#define AS_CLOSURE(value)      ((ObjectClosure *)AS_OBJECT(value))
+#define AS_CLASS(value)        ((ObjectClass *)AS_OBJECT(value))
+#define AS_INSTANCE(value)     ((ObjectInstance *)AS_OBJECT(value))
+#define AS_BOUND_METHOD(value) ((ObjectBoundMethod*)AS_OBJECT(value))
+#define UNWRAP_CLOSURE(value)  (AS_CLOSURE(value))->function
 
 #define ALLOCATE_OBJECT(Type, ObjectType) \
   (Type *)allocate_object(sizeof(Type), ObjectType)
@@ -31,13 +33,14 @@
 uint64_t hash_string(const char*, int);
 
 typedef enum {
-  OBJ_STRING,
+  OBJ_BOUND_METHOD,
   OBJ_FUNCTION,
-  OBJ_NATIVE,
+  OBJ_INSTANCE,
   OBJ_CLOSURE,
   OBJ_UPVALUE,
-  OBJ_CLASS,
-  OBJ_INSTANCE
+  OBJ_STRING,
+  OBJ_NATIVE,
+  OBJ_CLASS
 } ObjectType;
 
 #define _STR(value) #value
@@ -102,12 +105,13 @@ typedef struct {
   int upvalue_count;
 } ObjectClosure;
 
+#include "table.h"
+
 typedef struct {
   Object object;
   ObjectString* name;
+  Table methods;
 } ObjectClass;
-
-#include "table.h"
 
 typedef struct {
   Object object;
@@ -115,9 +119,16 @@ typedef struct {
   Table fields;
 } ObjectInstance;
 
+typedef struct {
+  Object object;
+  Value receiver;
+  ObjectClosure* method;
+} ObjectBoundMethod;
+
 void new_object(Object*);
 ObjectInstance* new_instance(ObjectClass*);
 ObjectClass* new_class(ObjectString*);
+ObjectBoundMethod* new_bound_method(Value, ObjectClosure*);
 ObjectUpvalue* new_upvalue(Value*);
 ObjectClosure* new_closure(ObjectFunction*);
 ObjectFunction* new_function();
@@ -151,7 +162,15 @@ ObjectNative* new_native(NativeFn function, const char* name) {
 ObjectClass* new_class(ObjectString* klass_name) {
   ObjectClass* klass = ALLOCATE_OBJECT(ObjectClass, OBJ_CLASS);
   klass->name = klass_name;
+  table_init(&klass->methods);
   return klass;
+}
+
+ObjectBoundMethod* new_bound_method(Value receiver, ObjectClosure* method) {
+  ObjectBoundMethod* bound_method = ALLOCATE_OBJECT(ObjectBoundMethod, OBJ_BOUND_METHOD);
+  bound_method->receiver = receiver;
+  bound_method->method = method;
+  return bound_method;
 }
 
 ObjectInstance* new_instance(ObjectClass* klass) {
@@ -195,20 +214,29 @@ void value_function_print(ObjectFunction* function) {
   else printf("<fn %s>", function->name->chars);
 }
 
+void print_bound_method(ObjectBoundMethod* bound_method) {
+  printf("<bound ");
+  value_print(OBJECT_VAL(bound_method->method));
+  printf(" to ");
+  value_print(bound_method->receiver);
+  printf(">");
+}
+
 void value_oprint(Value value) {
   if ( !value.payload.object ) {
     printf("(NULL OBJECT)");
     return;
   }
   switch ( OBJECT_TYPE(value) ) {
-  case OBJ_UPVALUE: printf("upvalue");                                                 break;
-  case OBJ_NATIVE: printf("<native fn(%s)>", AS_NATIVE_OBJ(value)->name);              break;
-  case OBJ_STRING: printf("%s", AS_CSTRING(value));                                    break;
-  case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));                         break;
-  case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value));                       break;
-  case OBJ_CLASS: printf("<class %s>", AS_CLASS(value)->name->chars);                  break;
-  case OBJ_INSTANCE: printf("<%s instance>", AS_INSTANCE(value)->klass->name->chars);  break;
-  default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value)); break;
+  case OBJ_UPVALUE: printf("upvalue");                                                   break;
+  case OBJ_STRING: printf("%s", AS_CSTRING(value));                                      break;
+  case OBJ_FUNCTION: value_function_print(AS_FUNCTION(value));                           break;
+  case OBJ_CLOSURE: value_function_print(UNWRAP_CLOSURE(value));                         break;
+  case OBJ_CLASS: printf("<class %s>", AS_CLASS(value)->name->chars);                    break;
+  case OBJ_BOUND_METHOD: print_bound_method(AS_BOUND_METHOD(value));                     break;
+  case OBJ_NATIVE: printf("<native fn(%s)>", AS_NATIVE_OBJ(value)->name);                break;
+  case OBJ_INSTANCE: printf("<instance of %s>", AS_INSTANCE(value)->klass->name->chars); break;
+  default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value));   break;
   }
 }
 
@@ -238,10 +266,13 @@ void object_delete(Object* object) {
   case OBJ_UPVALUE:
     FREE(ObjectUpvalue, object);                            break;
   case OBJ_CLASS:
+    table_delete(&((ObjectClass*)object)->methods);
     FREE(ObjectClass, object);                              break;
   case OBJ_INSTANCE:
     table_delete(&((ObjectInstance*)object)->fields);
     FREE(ObjectInstance, object);                           break;
+  case OBJ_BOUND_METHOD:
+    FREE(ObjectBoundMethod, object);                        break;
   default: printf("Deleting unknown object: %p\n", object); break;
   }
 }

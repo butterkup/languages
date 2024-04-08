@@ -10,6 +10,7 @@ CLOX_BEG_DECLS
 int byte_instruction(Chunk*, int);
 int simple_instruction(Chunk*, int);
 int constant_instruction(Chunk*, int);
+int invoke_instruction(Chunk*, int);
 int jump_instruction(Chunk*, int, int);
 int disassemble_instruction(Chunk*, int);
 void disassemble_chunk(Chunk*, const char*);
@@ -45,6 +46,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   case OP_RETURN:        return simple_instruction(chunk, offset);
   case OP_NEGATE:        return simple_instruction(chunk, offset);
   case OP_DIVIDE:        return simple_instruction(chunk, offset);
+  case OP_INVOKE:        return invoke_instruction(chunk, offset);
   case OP_GREATER:       return simple_instruction(chunk, offset);
   case OP_MULTIPLY:      return simple_instruction(chunk, offset);
   case OP_SUBTRACT:      return simple_instruction(chunk, offset);
@@ -53,6 +55,7 @@ int disassemble_instruction(Chunk* chunk, int offset) {
   case OP_JUMP_IF_FALSE: return jump_instruction(chunk, 1, offset);
   case OP_LOOP:          return jump_instruction(chunk, -1, offset);
   case OP_CLASS:         return constant_instruction(chunk, offset);
+  case OP_METHOD:        return constant_instruction(chunk, offset);
   case OP_CONSTANT:      return constant_instruction(chunk, offset);
   case OP_SET_GLOBAL:    return constant_instruction(chunk, offset);
   case OP_GET_GLOBAL:    return constant_instruction(chunk, offset);
@@ -103,6 +106,16 @@ int jump_instruction(Chunk* chunk, int sign, int offset) {
   uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8) | (chunk->code[offset + 2]);
   printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
   return offset + 3;
+}
+
+int invoke_instruction(Chunk* chunk, int offset) {
+  const char *name = inst_print(chunk->code[offset]);
+  uint8_t constant = chunk->code[++offset];
+  uint8_t arg_count = chunk->code[++offset];
+  printf("%-16s (%d args) '", name, arg_count);
+  value_print(chunk->constants.values[constant]);
+  printf("'\n");
+  return ++offset;
 }
 
 CLOX_END_DECLS

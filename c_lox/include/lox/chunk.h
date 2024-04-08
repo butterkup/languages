@@ -24,6 +24,8 @@ typedef enum {
   OP_MULTIPLY,
   OP_CLOSURE,
   OP_GREATER,
+  OP_INVOKE,
+  OP_METHOD,
   OP_DIVIDE,
   OP_RETURN,
   OP_NEGATE,
@@ -39,7 +41,7 @@ typedef enum {
   OP_NIL,
   OP_ADD,
   OP_NOT,
-  OP_POP
+  OP_POP,
 } OpCode; // Instruction Bytes
 
 #define INSTCS(inst) case OP##inst: return #inst + 1
@@ -63,6 +65,8 @@ const char *inst_print(uint8_t byte) {
   INSTCS(_MULTIPLY);
   INSTCS(_GREATER);
   INSTCS(_CLOSURE);
+  INSTCS(_INVOKE);
+  INSTCS(_METHOD);
   INSTCS(_DIVIDE);
   INSTCS(_RETURN);
   INSTCS(_NEGATE);

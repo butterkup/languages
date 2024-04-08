@@ -1,0 +1,23 @@
+class Pie {
+  init(flavor) {
+    this._flavor = flavor;
+  }
+  flavor() {
+    return this._flavor + " pie";
+  }
+}
+
+var pie = Pie("strawberry");
+print pie.flavor;
+print pie.flavor();
+
+fun flavor() {
+  return "Apple pie";
+}
+
+pie.flavor = flavor;
+
+print pie.flavor();
+
+if (pie) print "It is alive.";
+else print "It is definately dead";

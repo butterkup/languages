@@ -44,8 +44,10 @@ typedef struct {
 } Local;
 
 typedef enum {
+  TYPE_INITIALIZER,
   TYPE_FUNCTION,
-  TYPE_SCRIPT
+  TYPE_SCRIPT,
+  TYPE_METHOD
 } FunctionType;
 
 typedef struct {
@@ -65,8 +67,14 @@ struct Compiler {
   Upvalue upvalues[UINT8_COUNT];
 };
 
+typedef struct ClassCompiler {
+  struct ClassCompiler* enclosing;
+  Token name;
+} ClassCompiler;
+
 Parser parser;
 Compiler* current = NULL;
+ClassCompiler* current_class = NULL;
 
 void comp_init(Compiler* comp, FunctionType type) {
   comp->function = new_function();
@@ -80,10 +88,15 @@ void comp_init(Compiler* comp, FunctionType type) {
       parser.previous.start, parser.previous.length
     );
   Local* local = &current->locals[current->local_count++];
-  local->depth = 0;
-  local->name.start = "";
-  local->name.length = 0;
   local->is_captured = false;
+  local->depth = 0;
+  if ( type == TYPE_FUNCTION ) {
+    local->name.start = "";
+    local->name.length = 0;
+  } else {
+    local->name.start = "this";
+    local->name.length = 4;
+  }
 }
 
 void stmt_var();
@@ -98,6 +111,7 @@ void compiler_sync();
 void expr_unary(bool);
 void stmt_statement();
 int emit_jump(OpCode);
+void expr_this(bool);
 void expr_binary(bool);
 void expr_number(bool);
 void expr_string(bool);
@@ -105,6 +119,7 @@ void emit_byte(uint8_t);
 void stmt_declaration();
 void compiler_advance();
 void emit_byte(uint8_t);
+uint8_t argument_list();
 void expr_grouping(bool);
 void expr_variable(bool);
 void gc_mark_compiler_roots();
@@ -153,7 +168,7 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_PRINT,            NULL,               NULL,           _NONE),
   TKPREC_RULE(_RETURN,           NULL,               NULL,           _NONE),
   TKPREC_RULE(_SUPER,            NULL,               NULL,           _NONE),
-  TKPREC_RULE(_THIS,             NULL,               NULL,           _NONE),
+  TKPREC_RULE(_THIS,             expr_this,          NULL,           _NONE),
   TKPREC_RULE(_TRUE,             literal,            NULL,           _NONE),
   TKPREC_RULE(_VAR,              NULL,               NULL,           _NONE),
   TKPREC_RULE(_WHILE,            NULL,               NULL,           _NONE),
@@ -190,6 +205,12 @@ void error_at(const char* message) {
   _error_at(&parser.current, message);
 }
 
+void expr_this(bool) {
+  if ( current_class == NULL )
+    error("Can't use 'this' outside of a class.");
+  else expr_variable(false);
+}
+
 void expr_and(bool) {
   int jump_end = emit_jump(OP_JUMP_IF_FALSE);
   emit_byte(OP_POP);
@@ -209,9 +230,13 @@ void expr_or(bool) {
 void expr_dot(bool can_assign) {
   compiler_consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
   uint8_t property = identifier_constant(&parser.previous);
-  if (can_assign && compiler_match(TOKEN_EQUAL)) {
-  expression();
+  if ( can_assign && compiler_match(TOKEN_EQUAL) ) {
+    expression();
     emit_bytes(OP_SET_PROPERTY, property);
+  } else if ( compiler_match(TOKEN_LEFT_PAREN) ) {
+    uint8_t arg_count = argument_list();
+    emit_bytes(OP_INVOKE, property);
+    emit_byte(arg_count);
   } else emit_bytes(OP_GET_PROPERTY, property);
 }
 
@@ -220,6 +245,7 @@ void compiler_sync() {
   while ( !compiler_check(TOKEN_EOF) ) {
     if ( compiler_check(TOKEN_SEMICOLON) ) return;
     switch ( parser.current.type ) {
+    case TOKEN_RIGHT_BRACE:
     case TOKEN_RETURN:
     case TOKEN_CLASS:
     case TOKEN_WHILE:
@@ -266,7 +292,10 @@ void emit_bytes(uint8_t b1, uint8_t b2) {
 }
 
 void emit_return() {
-  emit_bytes(OP_NIL, OP_RETURN);
+  if (current->type == TYPE_INITIALIZER)
+    emit_bytes(OP_GET_LOCAL, 0);
+  else emit_byte(OP_NIL);
+  emit_byte(OP_RETURN);
 }
 
 uint8_t make_constant(Value constant) {
@@ -523,7 +552,7 @@ void scope_end() {
     if ( local->depth != current->scope_depth ) break;
     --current->local_count;
     emit_byte(current->locals[current->local_count - 1]
-      .is_captured? OP_CLOSE_UPVALUE: OP_POP);
+      .is_captured ? OP_CLOSE_UPVALUE : OP_POP);
   }
   --current->scope_depth;
 }
@@ -620,6 +649,8 @@ void stmt_return() {
     error("Can't return from top level code.");
   if ( compiler_match(TOKEN_SEMICOLON) ) emit_return();
   else {
+    if (current->type == TYPE_INITIALIZER)
+      error("Can't return a value from an initializer.");
     expression();
     consume_eos();
     emit_byte(OP_RETURN);
@@ -679,14 +710,34 @@ void stmt_fun() {
   define_variable(global);
 }
 
+void stmt_method() {
+  compiler_consume(TOKEN_IDENTIFIER, "Expect method name.");
+  uint8_t constant = identifier_constant(&parser.previous);
+  FunctionType type = TYPE_METHOD;
+  if (parser.previous.length == 4 && !memcmp(parser.previous.start, "init", 4))
+    type = TYPE_INITIALIZER;
+  consume_function(type);
+  emit_bytes(OP_METHOD, constant);
+}
+
 void stmt_class() {
   compiler_consume(TOKEN_IDENTIFIER, "Expect class name.");
+  Token klass_name = parser.previous;
   uint8_t name_constant = identifier_constant(&parser.previous);
   declare_variable();
   emit_bytes(OP_CLASS, name_constant);
   define_variable(name_constant);
+  ClassCompiler class_compiler;
+  class_compiler.name = parser.previous;
+  class_compiler.enclosing = current_class;
+  current_class = &class_compiler;
+  named_variable(klass_name, false);
   compiler_consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  while ( !compiler_check(TOKEN_RIGHT_BRACE) && !compiler_check(TOKEN_EOF) )
+    stmt_method();
   compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+  emit_byte(OP_POP);
+  current_class = current_class->enclosing;
 }
 
 void stmt_declaration() {
@@ -723,12 +774,12 @@ ObjectFunction* compile(const char* source) {
   return parser.had_error ? NULL : function;
 }
 
-void gc_mark_object(Object *);
+void gc_mark_object(Object*);
 
 void gc_mark_compiler_roots() {
   Compiler* comp = current;
   while ( comp != NULL ) {
-    gc_mark_object((Object *)comp->function);
+    gc_mark_object((Object*)comp->function);
     comp = comp->enclosing;
   }
 }

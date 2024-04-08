@@ -51,6 +51,7 @@ typedef struct {
   int gray_count;
   int gray_capacity;
   Object** gray_stack;
+  ObjectString* init_string;
 } Vm;
 
 typedef enum {
@@ -121,7 +122,7 @@ bool is_false(Value value) {
   return IS_NIL(value) ||
     ((IS_NUMBER(value)) && AS_NUMBER(value) == 0) ||
     ((IS_STRING(value)) && (AS_STRING(value))->length == 0) ||
-    ((IS_BOOL(value)) && AS_BOOL(value) == false) || true;
+    ((IS_BOOL(value)) && AS_BOOL(value) == false);
 }
 
 bool values_equal(Value a, Value b) {
@@ -193,10 +194,22 @@ bool call_value(Value callee, int arg_count) {
   case OBJ_CLASS: {
     ObjectClass* klass = AS_CLASS(callee);
     vm.stack_top[-arg_count - 1] = OBJECT_VAL(new_instance(klass));
+    Value initializer;
+    if ( table_get(&klass->methods, vm.init_string, &initializer) )
+      return call_function(AS_CLOSURE(initializer), arg_count);
+    else if ( arg_count ) {
+      runtime_error("Expected 0 arguments but got %d.", arg_count);
+      return false;
+    }
     return true;
   }
+  case OBJ_BOUND_METHOD: {
+    ObjectBoundMethod* bound_method = AS_BOUND_METHOD(callee);
+    vm.stack_top[-arg_count - 1] = bound_method->receiver;
+    return call_function(bound_method->method, arg_count);
   }
-  runtime_error("Can only call functions and classes.");
+  }
+  runtime_error("Can only call functions, classes and bound methods.");
   return false;
 }
 
@@ -210,7 +223,48 @@ void close_upvalues(Value* last) {
   }
 }
 
+void define_method(ObjectString* method_name) {
+  Value method = stack_peek(0);
+  ObjectClass* klass = AS_CLASS(stack_peek(1));
+  table_set(&klass->methods, method_name, method);
+  stack_pop();
+}
+
+bool bind_method(ObjectClass* klass, ObjectString* name) {
+  Value method;
+  if ( !table_get(&klass->methods, name, &method) ) return false;
+  ObjectBoundMethod* bound_method = new_bound_method(stack_peek(0), AS_CLOSURE(method));
+  stack_pop(); // Instance
+  stack_push(OBJECT_VAL(bound_method));
+  return true;
+}
+
+bool invoke_from_class(ObjectClass* klass, ObjectString* method_name, int arg_count) {
+  Value method;
+  if (!table_get(&klass->methods, method_name, &method)) {
+    runtime_error("Undefined property '%s'.", method_name->chars);
+    return false;
+  }
+  return call_function(AS_CLOSURE(method), arg_count);
+}
+
+bool invoke_property(ObjectString* property, int arg_count) {
+  Value receiver = stack_peek(arg_count);
+  if (!IS_INSTANCE(receiver)) {
+    runtime_error("Only instances have properties.");
+    return false;
+  }
+  ObjectInstance* instance = AS_INSTANCE(receiver);
+  Value field;
+  if(table_get(&instance->fields, property, &field)) {
+    vm.stack_top[-arg_count - 1] = field;
+    return call_value(field, arg_count);
+  }
+  return invoke_from_class(instance->klass, property, arg_count);
+}
+
 InterpretResult run() {
+  // puts("--- RUNNING ---");
 #ifdef CLOX_AINST_TRACE
   disassemble_chunk(&CHUNK(), "All Instructions");
 #endif // CLOX_AINST_TRACE
@@ -249,8 +303,15 @@ InterpretResult run() {
     case OP_LOOP:          VMIP() -= READ_SHORT();                            break;
     case OP_CLOSE_UPVALUE: close_upvalues(vm.stack_top - 1); stack_pop();     break;
     case OP_CLASS: stack_push(OBJECT_VAL(new_class(READ_STRING())));          break;
+    case OP_METHOD: define_method(READ_STRING());                             break;
+    case OP_INVOKE: {
+      ObjectString* property = READ_STRING();
+      int arg_count = READ_BYTE();
+      if(!invoke_property(property, arg_count))
+        return INTERPRET_RUNTIME_ERROR;                                       break;
+    }
     case OP_SET_PROPERTY: {
-      if (!IS_INSTANCE(stack_peek(1))) {
+      if ( !IS_INSTANCE(stack_peek(1)) ) {
         runtime_error("Only instances have fields.");
         return INTERPRET_RUNTIME_ERROR;
       }
@@ -261,17 +322,18 @@ InterpretResult run() {
       stack_push(value);                                                      break;
     }
     case OP_GET_PROPERTY: {
-      if (!IS_INSTANCE(stack_peek(0))) {
+      if ( !IS_INSTANCE(stack_peek(0)) ) {
         runtime_error("Only instances have properties.");
         return INTERPRET_RUNTIME_ERROR;
       }
       ObjectInstance* instance = AS_INSTANCE(stack_peek(0));
       ObjectString* property = READ_STRING();
       Value value;
-      if (table_get(&instance->fields, property, &value)) {
+      if ( table_get(&instance->fields, property, &value) ) {
         stack_pop(); // Instance
         stack_push(value);                                                    break;
       }
+      if ( bind_method(instance->klass, property) )                           break;
       runtime_error("Undefined property '%s'.", property->chars);
       return INTERPRET_RUNTIME_ERROR;
     }
@@ -297,7 +359,7 @@ InterpretResult run() {
       for ( int i = 0; i < closure->upvalue_count; ++i )
         closure->upvalues[i] = READ_BYTE() ?
         capture_upvalue(TOP_FRAME()->slots + READ_BYTE()) :
-        TOP_FRAME()->closure->upvalues[READ_BYTE()];                        break;
+        TOP_FRAME()->closure->upvalues[READ_BYTE()];                          break;
     }
     case OP_CALL: {
       int arg_count = READ_BYTE();
@@ -357,6 +419,7 @@ InterpretResult run() {
 
 InterpretResult
 interpret(const char* source) {
+  // puts("--- INTERPRET ---");
   ObjectFunction* function = compile(source);
   if ( function == NULL ) return INTERPRET_COMPILE_ERROR;
   stack_push(OBJECT_VAL(function));
@@ -380,6 +443,7 @@ void repl() {
 }
 
 char* read_file(const char* path) {
+  // printf("--- READ FILE '%s' ---\n", path);
   FILE* file = fopen(path, "rb");
   if ( file == NULL ) {
     fputs("Cannot open file.\n", stderr);
@@ -404,6 +468,7 @@ char* read_file(const char* path) {
 }
 
 int run_file(const char* path) {
+  // puts("--- RUNNING FIlE ---");
   char* source = read_file(path);
   InterpretResult result = interpret(source);
   free(source);
@@ -462,6 +527,7 @@ ObjectUpvalue* capture_upvalue(Value* slot) {
 }
 
 void vm_init() {
+  vm.init_string = NULL;
   table_init(&vm.globals);
   table_init(&vm.strings);
   vm.objects = NULL;
@@ -469,6 +535,7 @@ void vm_init() {
   vm.gray_count = 0;
   vm.gray_stack = NULL;
   reset_stack();
+  vm.init_string = copy_string("init", 4);
   setup_lox_native();
 }
 
@@ -485,6 +552,7 @@ void intern_string(ObjectString* string) {
 }
 
 void vm_delete() {
+  vm.init_string = NULL;
   table_delete(&vm.globals);
   table_delete(&vm.strings);
   objects_delete(vm.objects);
@@ -525,6 +593,7 @@ void gc_mark_table(Table* table) {
 }
 
 void gc_mark_roots() {
+  gc_mark_object((Object*)vm.init_string);
   for ( Value* slot = vm.stack; slot < vm.stack_top; ++slot )
     gc_mark_value(*slot);
   for ( int i = 0; i < vm.frame_count; ++i )
@@ -563,13 +632,20 @@ void gc_blacken_object(Object* object) {
   }
   case OBJ_CLASS: {
     ObjectClass* klass = (ObjectClass*)object;
+    gc_mark_table(&klass->methods);
     gc_mark_object((Object*)klass->name);                            break;
   }
   case OBJ_INSTANCE: {
     ObjectInstance* instance = (ObjectInstance*)object;
     gc_mark_object((Object*)instance->klass);
-    gc_mark_table(&instance->fields);
+    gc_mark_table(&instance->fields);                                break;
   }
+  case OBJ_BOUND_METHOD: {
+    ObjectBoundMethod* bound_method = (ObjectBoundMethod*)object;
+    gc_mark_value(bound_method->receiver);
+    gc_mark_object((Object*)bound_method->method);                   break;
+  }
+  default: printf("Blackening Unknown Object: %p\n", object);
   }
 }
 
