@@ -1,3 +1,36 @@
+class PersonInit {
+  init(name, age) {
+    this.name = name;
+    this.age = age;
+  }
+}
+
+class Person < PersonInit {
+  str() {
+    return (
+      "My name is " +
+      this.name + " and I'm " +
+      this.age + " years old."
+    );
+  }
+}
+
+class Employee < Person {
+  init(name, age, job) {
+    super.init(name, age);
+    this.job = job;
+  }
+}
+
+var me = Employee("Simon Nganga", "21", "Software Engineer");
+print(me.str());
+
+// var me = Person("Simon Nganga", "21");
+// var sis = Person("Faith Njeri", "11");
+// print(me.str());
+// print(sis.str());
+
+/*
 class Pie {
   init(flavor) {
     this._flavor = flavor;
@@ -21,3 +54,4 @@ print pie.flavor();
 
 if (pie) print "It is alive.";
 else print "It is definately dead";
+*/

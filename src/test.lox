@@ -1,0 +1,22 @@
+class Base {
+  base() {
+    print "Base.base()";
+  }
+}
+
+class Child < Base {
+  child() {
+    print "Child.child()";
+  }
+}
+
+class Child2 < Child {
+  child() {
+    print "Child2.child()";
+    super.child();
+    this.base();
+    return this;
+  }
+}
+
+print Child2().child();

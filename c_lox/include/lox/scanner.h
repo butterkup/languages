@@ -271,7 +271,7 @@ const char* strtokentype(TokenType type) {
 #undef CSTKTP
 
 void token_print(Token* token) {
-  printf("Token(%s, '%.*s', %d)\n",
+  printf("Token(%s, '%.*s', %d)",
     strtokentype(token->type),
     token->length,
     token->start,

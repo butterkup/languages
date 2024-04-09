@@ -241,7 +241,7 @@ bool bind_method(ObjectClass* klass, ObjectString* name) {
 
 bool invoke_from_class(ObjectClass* klass, ObjectString* method_name, int arg_count) {
   Value method;
-  if (!table_get(&klass->methods, method_name, &method)) {
+  if ( !table_get(&klass->methods, method_name, &method) ) {
     runtime_error("Undefined property '%s'.", method_name->chars);
     return false;
   }
@@ -250,13 +250,13 @@ bool invoke_from_class(ObjectClass* klass, ObjectString* method_name, int arg_co
 
 bool invoke_property(ObjectString* property, int arg_count) {
   Value receiver = stack_peek(arg_count);
-  if (!IS_INSTANCE(receiver)) {
+  if ( !IS_INSTANCE(receiver) ) {
     runtime_error("Only instances have properties.");
     return false;
   }
   ObjectInstance* instance = AS_INSTANCE(receiver);
   Value field;
-  if(table_get(&instance->fields, property, &field)) {
+  if ( table_get(&instance->fields, property, &field) ) {
     vm.stack_top[-arg_count - 1] = field;
     return call_value(field, arg_count);
   }
@@ -304,10 +304,37 @@ InterpretResult run() {
     case OP_CLOSE_UPVALUE: close_upvalues(vm.stack_top - 1); stack_pop();     break;
     case OP_CLASS: stack_push(OBJECT_VAL(new_class(READ_STRING())));          break;
     case OP_METHOD: define_method(READ_STRING());                             break;
+    case OP_SUPER_INVOKE: {
+      ObjectString* method = READ_STRING();
+      int arg_count = READ_BYTE();
+      ObjectClass* sup = AS_CLASS(stack_pop());
+      if (!invoke_from_class(sup, method, arg_count))
+        return INTERPRET_RUNTIME_ERROR;                                       break;
+    }
+    case OP_GET_SUPER: {
+      ObjectString* name = READ_STRING();
+      ObjectClass* sup = AS_CLASS(stack_pop());
+      if ( !bind_method(sup, name) ) {
+        runtime_error("Could not resolve '%s' from superclass '%s'.",
+          name->chars, sup->name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }                                                                       break;
+    }
+    case OP_INHERIT: {
+      if ( !IS_CLASS(stack_peek(1)) ) {
+        runtime_error("Super classes must be classes.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      ObjectClass
+        * sup = AS_CLASS(stack_peek(1)),
+        * sub = AS_CLASS(stack_peek(0));
+      table_concat(&sub->methods, &sup->methods);
+      stack_pop();                                                            break;
+    }
     case OP_INVOKE: {
       ObjectString* property = READ_STRING();
       int arg_count = READ_BYTE();
-      if(!invoke_property(property, arg_count))
+      if ( !invoke_property(property, arg_count) )
         return INTERPRET_RUNTIME_ERROR;                                       break;
     }
     case OP_SET_PROPERTY: {

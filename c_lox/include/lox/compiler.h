@@ -70,6 +70,7 @@ struct Compiler {
 typedef struct ClassCompiler {
   struct ClassCompiler* enclosing;
   Token name;
+  bool has_superclass;
 } ClassCompiler;
 
 Parser parser;
@@ -115,6 +116,7 @@ void expr_this(bool);
 void expr_binary(bool);
 void expr_number(bool);
 void expr_string(bool);
+void expr_super(bool);
 void emit_byte(uint8_t);
 void stmt_declaration();
 void compiler_advance();
@@ -123,10 +125,12 @@ uint8_t argument_list();
 void expr_grouping(bool);
 void expr_variable(bool);
 void gc_mark_compiler_roots();
+bool compiler_check(TokenType);
 bool compiler_match(TokenType);
+void named_variable(Token, bool);
 void emit_bytes(uint8_t, uint8_t);
 ObjectFunction* compiler_delete();
-bool compiler_check(TokenType);
+Token synthetic_token(const char *);
 uint8_t identifier_constant(Token*);
 bool identifier_equal(Token*, Token*);
 void compiler_consume(TokenType, const char*);
@@ -167,7 +171,7 @@ ParserRule tkprec_rules[] = {
   TKPREC_RULE(_OR,               NULL,               expr_or,        _OR),
   TKPREC_RULE(_PRINT,            NULL,               NULL,           _NONE),
   TKPREC_RULE(_RETURN,           NULL,               NULL,           _NONE),
-  TKPREC_RULE(_SUPER,            NULL,               NULL,           _NONE),
+  TKPREC_RULE(_SUPER,            expr_super,         NULL,           _NONE),
   TKPREC_RULE(_THIS,             expr_this,          NULL,           _NONE),
   TKPREC_RULE(_TRUE,             literal,            NULL,           _NONE),
   TKPREC_RULE(_VAR,              NULL,               NULL,           _NONE),
@@ -238,6 +242,24 @@ void expr_dot(bool can_assign) {
     emit_bytes(OP_INVOKE, property);
     emit_byte(arg_count);
   } else emit_bytes(OP_GET_PROPERTY, property);
+}
+
+void expr_super(bool can_assign) {
+  compiler_consume(TOKEN_DOT, "Expect '.' after super keyword.");
+  compiler_consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+  if ( !current_class ) error("Cannot use super outside of a class.");
+  if ( !current_class->has_superclass ) error("Cannot use super in a class with no superclass.");
+  uint8_t name = identifier_constant(&parser.previous);
+  named_variable(synthetic_token("this"), false);
+  if (compiler_match(TOKEN_LEFT_PAREN)) {
+    uint8_t arg_count = argument_list();
+    named_variable(synthetic_token("super"), false);
+    emit_bytes(OP_SUPER_INVOKE, name);
+    emit_byte(arg_count);
+  } else {
+    named_variable(synthetic_token("super"), false);
+    emit_bytes(OP_GET_SUPER, name);
+  }
 }
 
 void compiler_sync() {
@@ -372,15 +394,21 @@ int resolve_upvalue(Compiler* compiler, Token* name) {
 }
 
 void named_variable(Token name, bool can_assign) {
+  // printf("Find: ");
+  // token_print(&name);
+  // printf(" | FoundAs: ");
   int arg;
   uint8_t set_op, get_op;
   if ( (arg = resolve_local(current, &name)) != -1 ) {
+    // printf("LOCAL\n");
     set_op = OP_SET_LOCAL;
     get_op = OP_GET_LOCAL;
   } else if ( (arg = resolve_upvalue(current, &name)) != -1 ) {
+    // printf("UPVALUE\n");
     set_op = OP_SET_UPVALUE;
     get_op = OP_GET_UPVALUE;
   } else {
+    // printf("GLOBAL\n");
     arg = identifier_constant(&name);
     set_op = OP_SET_GLOBAL;
     get_op = OP_GET_GLOBAL;
@@ -445,8 +473,7 @@ void expr_unary(bool) {
   case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
   default:
     printf("Unrecognized expr unary token type[%d]: '%s'\n",
-      optype, inst_print(optype));
-    exit(1);
+      optype, inst_print(optype));  exit(1);
   }
 }
 
@@ -474,8 +501,9 @@ void add_local(Token name) {
     return;
   }
   Local* local = current->locals + (current->local_count++);
-  local->depth = -1;
+  local->is_captured = false;
   local->name = name;
+  local->depth = -1;
 }
 
 bool identifier_equal(Token* id1, Token* id2) {
@@ -550,9 +578,8 @@ void scope_end() {
   while ( current->local_count > 0 ) {
     local = current->locals + current->local_count - 1;
     if ( local->depth != current->scope_depth ) break;
+    emit_byte(local->is_captured ? OP_CLOSE_UPVALUE : OP_POP);
     --current->local_count;
-    emit_byte(current->locals[current->local_count - 1]
-      .is_captured ? OP_CLOSE_UPVALUE : OP_POP);
   }
   --current->scope_depth;
 }
@@ -720,6 +747,15 @@ void stmt_method() {
   emit_bytes(OP_METHOD, constant);
 }
 
+Token synthetic_token(const char* lexeme) {
+  Token tok;
+  tok.length = (int)strlen(lexeme);
+  tok.start = lexeme;
+  tok.type = -1;
+  tok.line = 0;
+  return tok;
+}
+
 void stmt_class() {
   compiler_consume(TOKEN_IDENTIFIER, "Expect class name.");
   Token klass_name = parser.previous;
@@ -729,14 +765,28 @@ void stmt_class() {
   define_variable(name_constant);
   ClassCompiler class_compiler;
   class_compiler.name = parser.previous;
+  class_compiler.has_superclass = false;
   class_compiler.enclosing = current_class;
   current_class = &class_compiler;
+  if ( compiler_match(TOKEN_LESS) ) {
+    compiler_consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+    expr_variable(false);
+    if ( identifier_equal(&klass_name, &parser.previous) )
+      error("A class cannot inherit from itself.");
+    scope_begin();
+    add_local(synthetic_token("super"));
+    define_variable(0);
+    named_variable(klass_name, false);
+    emit_byte(OP_INHERIT);
+    class_compiler.has_superclass = true;
+  }
   named_variable(klass_name, false);
   compiler_consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
   while ( !compiler_check(TOKEN_RIGHT_BRACE) && !compiler_check(TOKEN_EOF) )
     stmt_method();
   compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
   emit_byte(OP_POP);
+  if (current_class->has_superclass) scope_end();
   current_class = current_class->enclosing;
 }
 
