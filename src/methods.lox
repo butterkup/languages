@@ -20,6 +20,10 @@ class Employee < Person {
     super.init(name, age);
     this.job = job;
   }
+  str() {
+    return super.str() +
+      " I'm a " + this.job + ".";
+  }
 }
 
 var me = Employee("Simon Nganga", "21", "Software Engineer");
@@ -31,6 +35,29 @@ print(me.str());
 // print(sis.str());
 
 /*
+class Base {
+  base() {
+    print "Base.base()";
+  }
+}
+
+class Child < Base {
+  child() {
+    print "Child.child()";
+  }
+}
+
+class Child2 < Child {
+  child() {
+    print "Child2.child()";
+    super.child();
+    this.base();
+    return this;
+  }
+}
+
+print Child2().child();
+
 class Pie {
   init(flavor) {
     this._flavor = flavor;

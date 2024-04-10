@@ -1,22 +1,35 @@
-class Base {
-  base() {
-    print "Base.base()";
+class ZooAn {
+  init() {
+    this.fox = 1;
+    this.cat = 1;
+    this.baboon = 1;
+    this.donkey = 1;
+    this.aardvark = 1;
+    this.elephant = 1;
   }
+  tuna() { return this.cat; }
+  mouse() { return this.fox; }
+  hay() { return this.donkey; }
+  ant() { return this.aardvark; }
+  banana() { return this.baboon; }
+  grass() { return this.elephant; }
 }
 
-class Child < Base {
-  child() {
-    print "Child.child()";
-  }
-}
+var zoo_an = ZooAn();
 
-class Child2 < Child {
-  child() {
-    print "Child2.child()";
-    super.child();
-    this.base();
-    return this;
-  }
-}
+var tsum = 0;
 
-print Child2().child();
+var start = clock();
+
+while (tsum < 100000000)
+  tsum = tsum
+      + zoo_an.ant()
+      + zoo_an.tuna()
+      + zoo_an.mouse()
+      + zoo_an.hay()
+      + zoo_an.ant()
+      + zoo_an.banana()
+      + zoo_an.grass();
+
+print clock() - start;
+print tsum;

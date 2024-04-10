@@ -52,6 +52,8 @@ typedef struct {
   int gray_capacity;
   Object** gray_stack;
   ObjectString* init_string;
+  size_t bytes_alloc;
+  size_t next_gc;
 } Vm;
 
 typedef enum {
@@ -61,6 +63,9 @@ typedef enum {
 } InterpretResult;
 
 Vm vm;
+// True if Garbage Collector is collecting.
+// Initialize to false to prevent GC from ever running.
+bool gc_collection_in_progress = false;
 
 ObjectString* take_string(char*, int);
 
@@ -139,11 +144,11 @@ bool values_equal(Value a, Value b) {
 
 ObjectString* take_string(char* chars, int length) {
   uint64_t hash = hash_string(chars, length);
-  ObjectString* string = table_find_string(&vm.strings, chars, length, hash);
-  if ( string != NULL ) {
-    FREE_ARRAY(char, chars, length + 1);
-    return string;
-  }
+  // ObjectString* string = table_find_string(&vm.strings, chars, length, hash);
+  // if ( string ) {
+  //   FREE_ARRAY(char, chars, length + 1);
+  //   return string;
+  // }
   return allocate_string(chars, length, hash);
 }
 
@@ -188,7 +193,7 @@ bool call_value(Value callee, int arg_count) {
   case OBJ_NATIVE: {
     NativeFn native = AS_NATIVE(callee);
     Value result = native(arg_count, vm.stack_top - arg_count);
-    vm.stack_top -= arg_count;
+    vm.stack_top -= arg_count + 1;
     stack_push(result); return true;
   }
   case OBJ_CLASS: {
@@ -308,7 +313,7 @@ InterpretResult run() {
       ObjectString* method = READ_STRING();
       int arg_count = READ_BYTE();
       ObjectClass* sup = AS_CLASS(stack_pop());
-      if (!invoke_from_class(sup, method, arg_count))
+      if ( !invoke_from_class(sup, method, arg_count) )
         return INTERPRET_RUNTIME_ERROR;                                       break;
     }
     case OP_GET_SUPER: {
@@ -561,6 +566,8 @@ void vm_init() {
   vm.gray_capacity = 0;
   vm.gray_count = 0;
   vm.gray_stack = NULL;
+  vm.bytes_alloc = 0;
+  vm.next_gc = 5000; // Some arbitrary start value.
   reset_stack();
   vm.init_string = copy_string("init", 4);
   setup_lox_native();
@@ -710,22 +717,44 @@ void gc_sweep() {
   }
 }
 
+void update_gc_state(size_t old_size, size_t new_size) {
+  vm.bytes_alloc += new_size - old_size;
+  if ( vm.bytes_alloc > vm.next_gc )
+    collect_garbage();
+}
+
 void collect_garbage() {
 #ifdef CLOX_NOGC
 # ifdef CLOX_GC_LOG
   puts("GC Invoked.");
 # endif
 #else
+  if ( gc_collection_in_progress ) {
+#ifdef CLOX_GC_LOG
+    printf("-- GC Invoked while still running: alloc=%ld next=%ld\n",
+      vm.bytes_alloc, vm.next_gc);
+#endif // CLOX_GC_LOG
+    return;
+  }
+  // Prevent any of the 4 collection phases
+  // from recursively invoking the GC.
+  gc_collection_in_progress = true;
 # ifdef CLOX_GC_LOG
   puts("-- gc begin");
+  size_t before = vm.bytes_alloc;
 # endif // CLOX_GC_LOG
   gc_mark_roots();
   gc_trace_references();
   gc_table_remove_white(&vm.strings);
-  gc_sweep();
+  gc_sweep(); // May lead to GC-invocation: object_delete -> reallocate -> collect_garbage
+  vm.next_gc = vm.bytes_alloc * GC_HEAP_GROW_FACTOR;
 # ifdef CLOX_GC_LOG
+  printf("-- collected %ld bytes (from %ld to %ld) next at %ld\n",
+    before - vm.bytes_alloc, before, vm.bytes_alloc, vm.next_gc);
   puts("-- gc end");
 # endif // CLOX_GC_LOG
+  // It's now safe for anyone to call GC
+  gc_collection_in_progress = false;
 #endif // CLOX_NOGC
 }
 

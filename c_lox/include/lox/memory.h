@@ -21,19 +21,23 @@ CLOX_BEG_DECLS
   (Type *)reallocate(NULL, 0, sizeof(Type) * (Size))
 
 void collect_garbage();
+void update_gc_state(size_t old_size, size_t new_size);
 
 void* reallocate(void* ptr, size_t osize, size_t nsize) {
-  if (nsize > osize) {
+  // puts("~ realloc: start");
 #ifdef CLOX_GC_STRESS
-    collect_garbage();
+  if (nsize > osize) collect_garbage();
+#else
+  update_gc_state(osize, nsize);
 #endif // CLOX_GC_STRESS
-  }
   if ( nsize == 0 ) {
     free(ptr);
+    // puts("~ realloc: free");
     return NULL;
   }
   void* result = realloc(ptr, nsize);
-  if ( result == NULL ) exit(EXIT_FAILURE);
+  if ( !result ) exit(80);
+  // puts("~ realloc: alloc");
   return result;
 }
 

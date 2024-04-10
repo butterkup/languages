@@ -76,13 +76,13 @@ ObjectString* table_find_string(Table* table, const char* chars, int length, uin
   uint64_t index = hash % table->capacity;
   Entry* entry = table->entries + index;
   for ( ;; index = (index + 1) % table->capacity,
-    entry = table->entries + index )
+    entry = table->entries + index)
     if ( entry->key == NULL && IS_NIL(entry->value) ) return NULL;
-    else if ( entry->key->length == length &&
+    else if ( entry->key &&
+      entry->key->length == length &&
       entry->key->hash == hash &&
       !memcmp(entry->key->chars, chars, length) )
       return entry->key;
-  printf("DidNotFindInternFor: \"%.*s\"\n", length, chars);
   return NULL;
 }
 

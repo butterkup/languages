@@ -27,6 +27,7 @@
 # endif
 #endif
 #define UINT8_COUNT (UINT8_MAX + 1)
+#define GC_HEAP_GROW_FACTOR 2
 
 // #define CLOX_GC_STRESS
 // #define CLOX_GC_LOG
