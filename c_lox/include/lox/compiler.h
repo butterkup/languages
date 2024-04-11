@@ -130,7 +130,7 @@ bool compiler_match(TokenType);
 void named_variable(Token, bool);
 void emit_bytes(uint8_t, uint8_t);
 ObjectFunction* compiler_delete();
-Token synthetic_token(const char *);
+Token synthetic_token(const char*);
 uint8_t identifier_constant(Token*);
 bool identifier_equal(Token*, Token*);
 void compiler_consume(TokenType, const char*);
@@ -251,7 +251,7 @@ void expr_super(bool can_assign) {
   if ( !current_class->has_superclass ) error("Cannot use super in a class with no superclass.");
   uint8_t name = identifier_constant(&parser.previous);
   named_variable(synthetic_token("this"), false);
-  if (compiler_match(TOKEN_LEFT_PAREN)) {
+  if ( compiler_match(TOKEN_LEFT_PAREN) ) {
     uint8_t arg_count = argument_list();
     named_variable(synthetic_token("super"), false);
     emit_bytes(OP_SUPER_INVOKE, name);
@@ -314,7 +314,7 @@ void emit_bytes(uint8_t b1, uint8_t b2) {
 }
 
 void emit_return() {
-  if (current->type == TYPE_INITIALIZER)
+  if ( current->type == TYPE_INITIALIZER )
     emit_bytes(OP_GET_LOCAL, 0);
   else emit_byte(OP_NIL);
   emit_byte(OP_RETURN);
@@ -676,7 +676,7 @@ void stmt_return() {
     error("Can't return from top level code.");
   if ( compiler_match(TOKEN_SEMICOLON) ) emit_return();
   else {
-    if (current->type == TYPE_INITIALIZER)
+    if ( current->type == TYPE_INITIALIZER )
       error("Can't return a value from an initializer.");
     expression();
     consume_eos();
@@ -741,7 +741,7 @@ void stmt_method() {
   compiler_consume(TOKEN_IDENTIFIER, "Expect method name.");
   uint8_t constant = identifier_constant(&parser.previous);
   FunctionType type = TYPE_METHOD;
-  if (parser.previous.length == 4 && !memcmp(parser.previous.start, "init", 4))
+  if ( parser.previous.length == 4 && !memcmp(parser.previous.start, "init", 4) )
     type = TYPE_INITIALIZER;
   consume_function(type);
   emit_bytes(OP_METHOD, constant);
@@ -786,7 +786,7 @@ void stmt_class() {
     stmt_method();
   compiler_consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
   emit_byte(OP_POP);
-  if (current_class->has_superclass) scope_end();
+  if ( current_class->has_superclass ) scope_end();
   current_class = current_class->enclosing;
 }
 

@@ -64,14 +64,17 @@ typedef enum {
 
 Vm vm;
 // True if Garbage Collector is collecting.
-// Initialize to false to prevent GC from ever running.
+// Initialize to true to prevent GC from ever running.
+// Simple mutex to allow GC invocations when
+// false and ignore when true.
 bool gc_collection_in_progress = false;
 
 ObjectString* take_string(char*, int);
 
 void stack_push(Value value) {
-  *vm.stack_top = value;
-  vm.stack_top++;
+  *vm.stack_top++ = value;
+  // *vm.stack_top = value;
+  // vm.stack_top++;
 }
 
 ObjectString* table_find_istring(const char* payload, int size, uint64_t hash) {
@@ -79,8 +82,9 @@ ObjectString* table_find_istring(const char* payload, int size, uint64_t hash) {
 }
 
 Value stack_pop() {
-  vm.stack_top--;
-  return *vm.stack_top;
+  // vm.stack_top--;
+  // return *vm.stack_top;
+  return *--vm.stack_top;
 }
 
 Value stack_peek(int distance) {
@@ -567,7 +571,7 @@ void vm_init() {
   vm.gray_count = 0;
   vm.gray_stack = NULL;
   vm.bytes_alloc = 0;
-  vm.next_gc = 5000; // Some arbitrary start value.
+  vm.next_gc = GC_NEXT_INIT;
   reset_stack();
   vm.init_string = copy_string("init", 4);
   setup_lox_native();
@@ -679,7 +683,7 @@ void gc_blacken_object(Object* object) {
     gc_mark_value(bound_method->receiver);
     gc_mark_object((Object*)bound_method->method);                   break;
   }
-  default: printf("Blackening Unknown Object: %p\n", object);
+  default: printf("Blackening Unknown Object: %p\n", object);        break;
   }
 }
 
@@ -698,7 +702,7 @@ void gc_trace_references() {
 }
 
 void gc_sweep() {
-  Object* prev = NULL, * obj = vm.objects, * slot;
+  Object* prev = NULL, * obj = vm.objects;
   while ( obj ) {
     if ( obj->is_marked ) {
       obj->is_marked = false;
@@ -707,13 +711,13 @@ void gc_sweep() {
     }
 #ifdef CLOX_GC_LOG
     printf("%p delete ", (void*)obj);
-    value_print(OBJECT_VAL(obj));
+    value_oprint(OBJECT_VAL(obj));
     putchar(10);
 #endif // CLOX_GC_LOG
-    slot = obj; obj = obj->next;
-    if ( prev ) prev->next = obj;
-    else vm.objects = obj;
-    object_delete(slot);
+    if ( prev ) prev->next = obj->next;
+    else vm.objects = obj->next;
+    object_delete(obj);
+    obj = (prev ? prev : vm.objects)->next;
   }
 }
 
@@ -729,6 +733,7 @@ void collect_garbage() {
   puts("GC Invoked.");
 # endif
 #else
+  // Prevent recursive GC invocation.
   if ( gc_collection_in_progress ) {
 #ifdef CLOX_GC_LOG
     printf("-- GC Invoked while still running: alloc=%ld next=%ld\n",

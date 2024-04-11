@@ -1,4 +1,4 @@
-class ZooAn {
+class Zoo {
   init() {
     this.fox = 1;
     this.cat = 1;
@@ -15,21 +15,21 @@ class ZooAn {
   grass() { return this.elephant; }
 }
 
-var zoo_an = ZooAn();
+var zoo = Zoo();
 
-var tsum = 0;
+var sum = 0;
 
 var start = clock();
 
-while (tsum < 100000000)
-  tsum = tsum
-      + zoo_an.ant()
-      + zoo_an.tuna()
-      + zoo_an.mouse()
-      + zoo_an.hay()
-      + zoo_an.ant()
-      + zoo_an.banana()
-      + zoo_an.grass();
+while (sum < 100000000)
+  sum = sum
+      + zoo.ant()
+      + zoo.tuna()
+      + zoo.mouse()
+      + zoo.hay()
+      + zoo.ant()
+      + zoo.banana()
+      + zoo.grass();
 
 print clock() - start;
-print tsum;
+print sum;

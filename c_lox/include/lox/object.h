@@ -227,6 +227,9 @@ void value_oprint(Value value) {
     printf("(NULL OBJECT)");
     return;
   }
+#ifdef CLOX_OBJECT_TYPE
+  printf("<%s at %p \"", strobjtype(OBJECT_TYPE(value)), value.payload.object);
+#endif // CLOX_OBJECT_TYPE
   switch ( OBJECT_TYPE(value) ) {
   case OBJ_UPVALUE: printf("upvalue");                                                   break;
   case OBJ_STRING: printf("%s", AS_CSTRING(value));                                      break;
@@ -238,42 +241,45 @@ void value_oprint(Value value) {
   case OBJ_INSTANCE: printf("<instance of %s>", AS_INSTANCE(value)->klass->name->chars); break;
   default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value));   break;
   }
+#ifdef CLOX_OBJECT_TYPE
+  printf("\">");
+#endif // CLOX_OBJECT_TYPE
 }
 
 void object_delete(Object* object) {
+  if (!object) {
+    printf("Delete Object NULL detected.\n");
+    exit(90);
+  }
 #ifdef CLOX_ODEL_TRACE
-  printf("DEL_OBJECT: ");
+  printf("%p DELETE(%s): ", object, strobjtype(object->type));
   value_oprint(OBJECT_VAL(object));
   putchar(10);
 #endif
   switch ( object->type ) {
+  case OBJ_BOUND_METHOD: FREE(ObjectBoundMethod, object);        break;
+  case OBJ_NATIVE: FREE(ObjectNative, object);                   break;
+  case OBJ_UPVALUE: FREE(ObjectUpvalue, object);                 break;
   case OBJ_STRING: {
     ObjectString* string = (ObjectString*)object;
     FREE_ARRAY(char, string->chars, string->length + 1);
-    FREE(ObjectString, object);                             break;
+    FREE(ObjectString, object);                                  break;
   }
   case OBJ_FUNCTION:
     chunk_delete(&((ObjectFunction*)object)->chunk);
-    FREE(ObjectFunction, object);                           break;
-  case OBJ_NATIVE:
-    FREE(ObjectNative, object);                             break;
-  case OBJ_CLOSURE:
-    FREE_ARRAY(ObjectUpvalue*,
-      ((ObjectClosure*)object)->upvalues,
-      ((ObjectClosure*)object)->upvalue_count
-    );
-    FREE(ObjectClosure, object);                            break;
-  case OBJ_UPVALUE:
-    FREE(ObjectUpvalue, object);                            break;
+    FREE(ObjectFunction, object);                                break;
+  case OBJ_CLOSURE: {
+    ObjectClosure* c = (ObjectClosure*)object;
+    FREE_ARRAY(ObjectUpvalue*, c->upvalues, c->upvalue_count);
+    FREE(ObjectClosure, object);                                 break;
+  }
   case OBJ_CLASS:
     table_delete(&((ObjectClass*)object)->methods);
-    FREE(ObjectClass, object);                              break;
+    FREE(ObjectClass, object);                                   break;
   case OBJ_INSTANCE:
     table_delete(&((ObjectInstance*)object)->fields);
-    FREE(ObjectInstance, object);                           break;
-  case OBJ_BOUND_METHOD:
-    FREE(ObjectBoundMethod, object);                        break;
-  default: printf("Deleting unknown object: %p\n", object); break;
+    FREE(ObjectInstance, object);                                break;
+  default: printf("Deleting unknown object: %p\n", object);      break;
   }
 }
 

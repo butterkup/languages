@@ -5,6 +5,6 @@ fun fib(n) {
 
 print "Running";
 var start = clock();
-print fib(35);
+print fib(40);
 var stop = clock();
 print stop - start;

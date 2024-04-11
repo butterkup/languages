@@ -1,10 +1,10 @@
-fun add(a, b) {
+fun add_strings(a, b) {
   var c = a + b;
-//  print "'" + a + "' + '" + b + "' = '" + c + "'";
+  // print "'" + a + "' + '" + b + "' = '" + c + "'";
   return c;
 }
 
-var string = ".";
+var string = "";
 
 for (var count = 0; count < 5000; count = count + 1)
-  print string = add(string, ".");
+  string = add_strings(string, "A");
