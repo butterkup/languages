@@ -25,12 +25,12 @@ void entry_print(Entry*);
 
 void table_init(Table* table) {
   table->entries = NULL;
-  table->capacity = 0;
+  table->capacity = -1;
   table->count = 0;
 }
 
 void table_delete(Table* table) {
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+  FREE_ARRAY(Entry, table->entries, table->capacity + 1);
 }
 
 uint64_t fnv1a_algo(const char* chars, int length) {
@@ -54,16 +54,13 @@ uint64_t hash_string(const char* chars, int length) {
   return HASH_FUNCTION(chars, length);
 }
 
+/* cap must be a mask: capacity - 1 */
 Entry* entry_find(Entry* const entries, int cap, ObjectString* const key) {
-  uint64_t idx = key->hash % cap;
+  // uint64_t idx = key->hash % cap;
+  uint64_t idx = key->hash & cap;
   Entry* tombstone = NULL, * entry = entries + idx;
-  for ( ;; idx = (idx + 1) % cap, entry = entries + idx )
+  for ( ;; idx = (idx + 1) & cap, entry = entries + idx )
     if ( entry->key == key ) return entry;
-    // else if (
-    //   entry->key &&
-    //   key->length == entry->key->length &&
-    //   !memcmp(key->chars, entry->key->chars, key->length)
-    //   ) return entry;
     else if ( entry->key == NULL )
       if ( IS_NIL(entry->value) )
         return tombstone ? tombstone : entry;
@@ -73,10 +70,10 @@ Entry* entry_find(Entry* const entries, int cap, ObjectString* const key) {
 
 ObjectString* table_find_string(Table* table, const char* chars, int length, uint64_t hash) {
   if ( table->count == 0 ) return NULL;
-  uint64_t index = hash % table->capacity;
+  uint64_t index = hash & table->capacity;
   Entry* entry = table->entries + index;
-  for ( ;; index = (index + 1) % table->capacity,
-    entry = table->entries + index)
+  for ( ;; index = (index + 1) & table->capacity,
+    entry = table->entries + index )
     if ( entry->key == NULL && IS_NIL(entry->value) ) return NULL;
     else if ( entry->key &&
       entry->key->length == length &&
@@ -91,25 +88,27 @@ void entry_init(Entry* entry) {
   entry->value = NIL_VAL;
 }
 
+/* new_capacity must be a mask: capacity - 1 */
 void table_adjust_cap(Table* table, int new_capacity) {
-  Entry* new_entries = ALLOCATE(Entry, new_capacity);
-  Entry* entry, *slot;
+  Entry* new_entries = ALLOCATE(Entry, new_capacity + 1);
+  Entry* entry, * slot;
   int count = 0;
   // Set all entries to NULL and NIL_VAL
-  for (int idx = 0; idx < new_capacity; idx++)
+  for ( int idx = 0; idx <= new_capacity; idx++ )
     entry_init(new_entries + idx);
   // Transfer the entries from old loc to new loc
   // by mapping slots appropriately
-  for (int idx = 0; idx < table->capacity; idx++) {
+  for ( int idx = 0; idx <= table->capacity; idx++ ) {
     entry = table->entries + idx;
-    if (!entry->key) continue;
-    slot = entry_find(new_entries,new_capacity, entry->key);
+    if ( !entry->key ) continue;
+    slot = entry_find(new_entries, new_capacity, entry->key);
     slot->key = entry->key;
     slot->value = entry->value;
     count++;
   }
-  // Free the old entries correctly
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+  // Free the old entries correctly.
+  // table_delete(table);
+  FREE_ARRAY(Entry, table->entries, table->capacity + 1);
   // Set the new adjusted table values
   table->capacity = new_capacity;
   table->entries = new_entries;
@@ -117,20 +116,21 @@ void table_adjust_cap(Table* table, int new_capacity) {
 }
 
 bool table_set(Table* table, ObjectString* key, Value value) {
-  if ( table->count + 1 > table->capacity * TABLE_MAX_LOAD )
-    table_adjust_cap(table, GROW_CAPACITY(table->capacity));
+  if ( table->count + 1 > (table->capacity + 1) * TABLE_MAX_LOAD )
+    table_adjust_cap(table, GROW_CAPACITY(table->capacity + 1) - 1);
   Entry* entry = entry_find(table->entries, table->capacity, key);
   bool new_entry = entry->key == NULL;
   if ( new_entry && IS_NIL(entry->value) ) table->count++;
-  // *entry = (Entry){ .key = key, .value = value };
-  entry->key = key; entry->value = value;
+  // entry->key = key; entry->value = value;
+  *entry = (Entry){ key, value };
   return new_entry;
 }
 
 void table_concat(Table* to, Table* from) {
-  Entry* c = from->entries, * e = c + from->capacity;
-  for ( ; c != e; ++c ) if ( c->key != NULL )
-    table_set(to, c->key, c->value);
+  Entry* e = from->entries;
+  int cap = from->capacity;
+  for ( ; cap >= 0; --cap, ++e ) if ( e->key )
+    table_set(to, e->key, e->value);
 }
 
 bool table_get(Table* table, ObjectString* key, Value* value) {
@@ -145,8 +145,8 @@ bool table_del(Table* table, ObjectString* key) {
   if ( table->count == 0 ) return false;
   Entry* entry = entry_find(table->entries, table->capacity, key);
   if ( !entry->key ) return false;
-  // *entry = (Entry){ .key = NULL, .value = BOOL_VAL(true) };
-  entry->key = NULL; entry->value = BOOL_VAL(true);
+  // entry->key = NULL; entry->value = BOOL_VAL(true);
+  *entry = (Entry){ NULL, BOOL_VAL(true) };
   return true;
 }
 
@@ -157,12 +157,11 @@ void entry_print(Entry* entry) {
 }
 
 void table_print(Table* table) {
-  Entry* entry = table->entries,
-    * const stop = entry + table->capacity;
+  Entry* e = table->entries;
+  int c = table->capacity;
   putchar('{');
-  for ( ; entry != stop; ++entry )
-    if ( entry->key )
-      entry_print(entry), printf(", ");
+  for ( ; c >= 0; --c, ++e) if ( e->key )
+    entry_print(e), printf(", ");
   putchar('}');
 }
 

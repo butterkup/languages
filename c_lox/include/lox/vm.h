@@ -7,6 +7,7 @@
 #include "chunk.h"
 #include "debug.h"
 #include "value.h"
+#include <time.h>
 #include "natives.h"
 
 CLOX_BEG_DECLS
@@ -68,6 +69,7 @@ Vm vm;
 // Simple mutex to allow GC invocations when
 // false and ignore when true.
 bool gc_collection_in_progress = false;
+long double vm_start_time = 0;
 
 ObjectString* take_string(char*, int);
 
@@ -75,6 +77,10 @@ void stack_push(Value value) {
   *vm.stack_top++ = value;
   // *vm.stack_top = value;
   // vm.stack_top++;
+}
+
+long double start_time() {
+  return vm_start_time;
 }
 
 ObjectString* table_find_istring(const char* payload, int size, uint64_t hash) {
@@ -107,7 +113,7 @@ void runtime_error(const char* format, ...) {
   ObjectFunction* function;
 
   for ( int i = vm.frame_count - 1; i >= 0; --i ) {
-    frame = &vm.frames[i];
+    frame = vm.frames + i;
     function = frame->closure->function;
     instruction = frame->ip - function->chunk.code - 1;
     fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
@@ -198,7 +204,13 @@ bool call_value(Value callee, int arg_count) {
     NativeFn native = AS_NATIVE(callee);
     Value result = native(arg_count, vm.stack_top - arg_count);
     vm.stack_top -= arg_count + 1;
-    stack_push(result); return true;
+    if ( IS_ERROR(result) ) {
+      printf("Error from ");
+      value_oprint(callee);
+      printf(": %s\n", AS_ERROR(result));
+    }
+    stack_push(IS_ERROR(result) ? NIL_VAL : result);
+    return !IS_ERROR(result);
   }
   case OBJ_CLASS: {
     ObjectClass* klass = AS_CLASS(callee);
@@ -467,10 +479,11 @@ interpret(const char* source) {
 }
 
 void repl() {
-  char line[1024];
+  const int length = 1024;
+  char line[length];
   for ( ;;) {
     printf("> ");
-    if ( !fgets(line, sizeof(line), stdin) ) {
+    if ( !fgets(line, length, stdin) ) {
       printf("\n");
       break;
     }
@@ -563,6 +576,7 @@ ObjectUpvalue* capture_upvalue(Value* slot) {
 }
 
 void vm_init() {
+  vm_start_time = time(NULL);
   vm.init_string = NULL;
   table_init(&vm.globals);
   table_init(&vm.strings);
@@ -623,7 +637,7 @@ void gc_mark_value(Value value) {
 
 void gc_mark_table(Table* table) {
   Entry* entry;
-  for ( int i = 0; i < table->capacity; ++i ) {
+  for ( int i = 0; i <= table->capacity; ++i ) {
     entry = table->entries + i;
     gc_mark_object((Object*)entry->key);
     gc_mark_value(entry->value);
@@ -689,7 +703,7 @@ void gc_blacken_object(Object* object) {
 
 void gc_table_remove_white(Table* table) {
   Entry* entry;
-  for ( int i = 0; i < table->capacity; ++i ) {
+  for ( int i = 0; i <= table->capacity; ++i ) {
     entry = table->entries + i;
     if ( entry->key && !entry->key->object.is_marked )
       table_del(table, entry->key);
@@ -723,14 +737,16 @@ void gc_sweep() {
 
 void update_gc_state(size_t old_size, size_t new_size) {
   vm.bytes_alloc += new_size - old_size;
+#if !(defined(CLOX_NOGC) || defined(CLOX_STRESS))
   if ( vm.bytes_alloc > vm.next_gc )
     collect_garbage();
+#endif // CLOX_NOGC
 }
 
 void collect_garbage() {
 #ifdef CLOX_NOGC
 # ifdef CLOX_GC_LOG
-  puts("GC Invoked.");
+  printf("GC Invoked: %ld\n", vm.bytes_alloc);
 # endif
 #else
   // Prevent recursive GC invocation.

@@ -60,9 +60,9 @@ int lexlen();
 Token _make_token_impl(TokenType type, const char* start, int length) {
   return (Token) {
     .start = start,
-    .type = type,
-    .length = length,
-    .line = scanner.line
+      .type = type,
+      .length = length,
+      .line = scanner.line
   };
 }
 
@@ -105,8 +105,9 @@ void skip_whitespace() {
 
 Token number() {
   while ( isdigit(peek()) ) advance();
-  if ( match('.') && isdigit(peek_next()) )
-    while ( isdigit(peek()) ) advance();
+  if ( match('.') )
+    if ( isdigit(peek()) ) while ( isdigit(peek()) ) advance();
+    else return error_token("Expect atleast one digit after decimal point.");
   return make_token(TOKEN_NUMBER);
 }
 
@@ -159,11 +160,11 @@ Token identifier() {
 Token scan();
 
 bool _consume_multiline_comment() {
-  while (!is_at_end()) switch(peek()) {
-    case '*': if ((advance(), match('/')))
-      return true;
-    case '\n': scanner.line++;
-    default: advance();
+  while ( !is_at_end() ) switch ( peek() ) {
+  case '*': if ( (advance(), match('/')) )
+    return true;
+  case '\n': scanner.line++;
+  default: advance();
   }
   return false;
 }

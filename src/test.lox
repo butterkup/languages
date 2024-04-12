@@ -15,21 +15,55 @@ class Zoo {
   grass() { return this.elephant; }
 }
 
-var zoo = Zoo();
+fun instances(total) {
+  var sum = 0;
+  while (sum < total)
+    sum = sum
+        + Zoo().hay()
+        + Zoo().ant()
+        + Zoo().tuna()
+        + Zoo().mouse()
+        + Zoo().grass()
+        + Zoo().banana();
+  return sum;
+}
 
-var sum = 0;
+fun instance(total) {
+  var sum = 0;
+  var zoo = Zoo();
+  while (sum < total)
+    sum = sum
+        + zoo.hay()
+        + zoo.ant()
+        + zoo.tuna()
+        + zoo.mouse()
+        + zoo.grass()
+        + zoo.banana();
+  return sum;
+}
 
-var start = clock();
+fun churn_dots(runner, total) {
+  total = total or 70000000;
+  var start = clock();
+  var sum = runner(total);
+  print clock() - start;
+  print sum;
+}
 
-while (sum < 100000000)
-  sum = sum
-      + zoo.ant()
-      + zoo.tuna()
-      + zoo.mouse()
-      + zoo.hay()
-      + zoo.ant()
-      + zoo.banana()
-      + zoo.grass();
+churn_dots(instance, nil);
 
-print clock() - start;
-print sum;
+fun sum_of(n) { return (n * (n + 1)) / 2; }
+
+fun spin(n) {
+  n = n or 5;
+  var start = clock();
+  for (var idx = n; idx; idx = idx - 1)
+    sleep(idx);
+  var end = clock();
+  print "Slept for";
+  print end - start;
+  print "Should be";
+  print sum_of(n);
+}
+
+// spin(nil);

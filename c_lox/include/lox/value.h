@@ -10,6 +10,7 @@ CLOX_BEG_DECLS
 typedef enum {
   VAL_NIL,
   VAL_BOOL,
+  VAL_ERROR,
   VAL_NUMBER,
   VAL_OBJECT,
 } ValueType;
@@ -22,6 +23,7 @@ typedef struct {
     bool boolean;
     double number;
     Object* object;
+    const char *error;
   } payload;
 } Value;
 
@@ -32,16 +34,18 @@ void stack_push(Value);
 #define IS_BOOL(value) ((value).type == VAL_BOOL)
 #define IS_NUMBER(value) ((value).type == VAL_NUMBER)
 #define IS_OBJECT(value) ((value).type == VAL_OBJECT)
+#define IS_ERROR(value)  ((value).type == VAL_ERROR)
 
 #define AS_BOOL(value) ((value).payload.boolean)
 #define AS_NUMBER(value) ((value).payload.number)
 #define AS_OBJECT(value) ((value).payload.object)
+#define AS_ERROR(value)  ((value).payload.error)
 
-#define NIL_VAL ((Value){ .type=VAL_NIL, .payload={ .number = 0 } })
-#define BOOL_VAL(value) ((Value){ .type=VAL_BOOL, .payload={ .boolean = value } })
-#define NUMBER_VAL(value) ((Value){ .type=VAL_NUMBER, .payload={ .number = value } })
-#define OBJECT_VAL(value) ((Value){ .type=VAL_OBJECT, .payload={ .object = (Object *)(value) } })
-
+#define NIL_VAL ((Value){ .type=VAL_NIL, .payload.number = 0 })
+#define BOOL_VAL(value) ((Value){ .type=VAL_BOOL, .payload.boolean = value })
+#define NUMBER_VAL(value) ((Value){ .type=VAL_NUMBER, .payload.number = value })
+#define OBJECT_VAL(value) ((Value){ .type=VAL_OBJECT, .payload.object = (Object *)(value) })
+#define ERROR_VAL(value)  ((Value){ .type=VAL_ERROR, .payload.error = (const char*)(value) })
 
 typedef struct {
   Value* values;

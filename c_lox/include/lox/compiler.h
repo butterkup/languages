@@ -237,11 +237,15 @@ void expr_dot(bool can_assign) {
   if ( can_assign && compiler_match(TOKEN_EQUAL) ) {
     expression();
     emit_bytes(OP_SET_PROPERTY, property);
-  } else if ( compiler_match(TOKEN_LEFT_PAREN) ) {
+  }
+#ifdef DOT_INVOKE_OPT
+  else if ( compiler_match(TOKEN_LEFT_PAREN) ) {
     uint8_t arg_count = argument_list();
     emit_bytes(OP_INVOKE, property);
     emit_byte(arg_count);
-  } else emit_bytes(OP_GET_PROPERTY, property);
+  }
+#endif // DOT_INVOKE_OPT
+  else emit_bytes(OP_GET_PROPERTY, property);
 }
 
 void expr_super(bool can_assign) {
@@ -251,15 +255,19 @@ void expr_super(bool can_assign) {
   if ( !current_class->has_superclass ) error("Cannot use super in a class with no superclass.");
   uint8_t name = identifier_constant(&parser.previous);
   named_variable(synthetic_token("this"), false);
+#ifdef SUPER_INVOKE_OPT
   if ( compiler_match(TOKEN_LEFT_PAREN) ) {
     uint8_t arg_count = argument_list();
     named_variable(synthetic_token("super"), false);
     emit_bytes(OP_SUPER_INVOKE, name);
     emit_byte(arg_count);
   } else {
+#endif // SUPER_INVOKE_OPT
     named_variable(synthetic_token("super"), false);
     emit_bytes(OP_GET_SUPER, name);
+#ifdef SUPER_INVOKE_OPT
   }
+#endif // SUPER_INVOKE_OPT
 }
 
 void compiler_sync() {
@@ -286,8 +294,10 @@ void compiler_advance() {
   for ( ;;) {
     parser.current = scan();
 #ifdef CLOX_SCAN_TRACE
-    if ( !is_at_end() || parser.previous.type != TOKEN_EOF )
+    if ( !is_at_end() || parser.previous.type != TOKEN_EOF ) {
       token_print(&parser.current);
+      printf("\n");
+    }
 #endif
     if ( parser.current.type != TOKEN_ERROR ) break;
     error_at(parser.current.start);
@@ -333,10 +343,11 @@ void emit_constant(Value constant) {
 
 void literal(bool) {
   switch ( parser.previous.type ) {
-  case TOKEN_NIL: emit_byte(OP_NIL);      break;
-  case TOKEN_TRUE: emit_byte(OP_TRUE);    break;
-  case TOKEN_FALSE: emit_byte(OP_FALSE);  break;
-  default: printf("Unknown literal type[%d]: %s -> '%.*s'\n",
+  case TOKEN_NIL: emit_byte(OP_NIL);             break;
+  case TOKEN_TRUE: emit_byte(OP_TRUE);           break;
+  case TOKEN_FALSE: emit_byte(OP_FALSE);         break;
+  default:
+    printf("Unknown literal type[%d]: %s -> '%.*s'\n",
     parser.previous.type,
     strtokentype(parser.previous.type),
     parser.previous.length,

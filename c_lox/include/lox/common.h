@@ -28,7 +28,19 @@
 #endif
 #define UINT8_COUNT (UINT8_MAX + 1)
 #define GC_HEAP_GROW_FACTOR 2
-#define GC_NEXT_INIT 1024 * 5
+
+#ifndef GC_NEXT_INIT
+# define GC_NEXT_INIT 1024 * 5
+#endif // GC_NEXT_INIT
+
+#ifdef CLOX_ALL_OPT
+# ifndef SUPER_INVOKE_OPT
+#  define SUPER_INVOKE_OPT
+# endif // SUPER_INVOKE_OPT
+# ifndef DOT_INVOKE_OPT
+#  define DOT_INVOKE_OPT
+# endif // DOT_INVOKE_OPT
+#endif // CLOX_ALL_OPT
 
 // #define CLOX_GC_STRESS
 // #define CLOX_GC_LOG

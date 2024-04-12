@@ -14,6 +14,9 @@ CLOX_DEFS["inst"]=CLOX_INST_TRACE
 CLOX_DEFS["odel"]=CLOX_ODEL_TRACE
 CLOX_DEFS["drun"]=CLOX_DRY_RUN
 CLOX_DEFS["nogc"]=CLOX_NOGC
+CLOX_DEFS["optall"]=CLOX_ALL_OPT
+CLOX_DEFS["optsupi"]=SUPER_INVOKE_OPT
+CLOX_DEFS["optdoti"]=DOT_INVOKE_OPT
 
 function _clox_valid_macro() {
   [ -z "$1" ] && return 1
