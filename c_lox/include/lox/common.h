@@ -16,15 +16,11 @@
 #else
 # define CLOX_BEG_DECLS
 # define CLOX_END_DECLS
-# ifndef false
-#  define false 0
-# endif
-# ifndef true
-#  define true 1
-# endif
-# ifndef bool
-#  define bool int
-# endif
+// Unfortunately, my IDE does not
+// recognize false, true and bool
+// as C keywords in C23
+# define false 0
+# define true 1
 #endif
 #define UINT8_COUNT (UINT8_MAX + 1)
 #define GC_HEAP_GROW_FACTOR 2
@@ -40,9 +36,20 @@
 # ifndef DOT_INVOKE_OPT
 #  define DOT_INVOKE_OPT
 # endif // DOT_INVOKE_OPT
+# ifndef TABLE_AND_FOLD_OPT
+#  define TABLE_AND_FOLD_OPT
+# endif // TABLE_AND_FOLD_OPT
+# ifndef NAN_BOXING_OPT
+#  define NAN_BOXING_OPT
+# endif // NAN_BOXING_OPT
 #endif // CLOX_ALL_OPT
 
 // #define CLOX_GC_STRESS
+// #define NAN_BOXING_OPT
+// #define TABLE_AND_FOLD_OPT
+// #define DOT_INVOKE_OPT
+// #define SUPER_INVOKE_OPT
+// #define CLOX_ALL_OPT
 // #define CLOX_GC_LOG
 // #define CLOX_NOGC
 // #defin CLOX_VAR_NO_SELF_INIT

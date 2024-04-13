@@ -141,6 +141,11 @@ bool is_false(Value value) {
 }
 
 bool values_equal(Value a, Value b) {
+#ifdef NAN_BOXING_OPT
+  if ( IS_NUMBER(a) && IS_NUMBER(b) )
+    return AS_NUMBER(a) == AS_NUMBER(b);
+  return a == b;
+#else
   if ( a.type != b.type ) return false;
   switch ( a.type ) {
   case VAL_NIL: return true;
@@ -149,6 +154,7 @@ bool values_equal(Value a, Value b) {
   case VAL_OBJECT: return AS_OBJECT(a) == AS_OBJECT(b);
   default: printf("ValuesEqual: type=%d not defined.\n", a.type);
   }
+#endif
   return false;
 }
 
@@ -306,8 +312,8 @@ InterpretResult run() {
 #endif
     switch ( instruction = READ_BYTE() ) {
     case OP_NIL:      stack_push(NIL_VAL);                                    break;
-    case OP_TRUE:     stack_push(BOOL_VAL(true));                             break;
-    case OP_FALSE:    stack_push(BOOL_VAL(false));                            break;
+    case OP_TRUE:     stack_push(TRUE_VAL);                                   break;
+    case OP_FALSE:    stack_push(FALSE_VAL);                                  break;
     case OP_CONSTANT: stack_push(READ_CONSTANT());                            break;
     case OP_LESS:     BINARY_OP(BOOL_VAL, < );                                break;
     case OP_GREATER:  BINARY_OP(BOOL_VAL, > );                                break;
@@ -425,10 +431,7 @@ InterpretResult run() {
     case OP_GET_GLOBAL: {
       ObjectString* name = READ_STRING();
       Value value;
-      // printf("String['%s']: %p\n", name->chars, name);
       if ( !table_get(&vm.globals, name, &value) ) {
-        table_print(&vm.globals);
-        putchar(10);
         runtime_error("[Getter] Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       } stack_push(value);                                                    break;
@@ -637,7 +640,7 @@ void gc_mark_value(Value value) {
 
 void gc_mark_table(Table* table) {
   Entry* entry;
-  for ( int i = 0; i <= table->capacity; ++i ) {
+  for ( int i = 0; i TAB_COMP_OP table->capacity; ++i ) {
     entry = table->entries + i;
     gc_mark_object((Object*)entry->key);
     gc_mark_value(entry->value);
@@ -703,7 +706,7 @@ void gc_blacken_object(Object* object) {
 
 void gc_table_remove_white(Table* table) {
   Entry* entry;
-  for ( int i = 0; i <= table->capacity; ++i ) {
+  for ( int i = 0; i TAB_COMP_OP table->capacity; ++i ) {
     entry = table->entries + i;
     if ( entry->key && !entry->key->object.is_marked )
       table_del(table, entry->key);
@@ -746,13 +749,13 @@ void update_gc_state(size_t old_size, size_t new_size) {
 void collect_garbage() {
 #ifdef CLOX_NOGC
 # ifdef CLOX_GC_LOG
-  printf("GC Invoked: %ld\n", vm.bytes_alloc);
+  printf("-- gc invoked: %ld\n", vm.bytes_alloc);
 # endif
 #else
   // Prevent recursive GC invocation.
   if ( gc_collection_in_progress ) {
 #ifdef CLOX_GC_LOG
-    printf("-- GC Invoked while still running: alloc=%ld next=%ld\n",
+    printf("-- gc invoked while still running: alloc=%ld next=%ld\n",
       vm.bytes_alloc, vm.next_gc);
 #endif // CLOX_GC_LOG
     return;

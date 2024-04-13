@@ -18,7 +18,7 @@ CLOX_BEG_DECLS
   reallocate(ptr, sizeof(type), 0)
 
 #define ALLOCATE(Type, Size) \
-  (Type *)reallocate(NULL, 0, sizeof(Type) * (Size))
+  ((Type *)reallocate(NULL, 0, sizeof(Type) * (Size)))
 
 void collect_garbage();
 void update_gc_state(size_t old_size, size_t new_size);
@@ -26,7 +26,7 @@ void update_gc_state(size_t old_size, size_t new_size);
 void* reallocate(void* ptr, size_t osize, size_t nsize) {
   update_gc_state(osize, nsize);
 #ifdef CLOX_GC_STRESS
-  if (nsize > osize) collect_garbage();
+  if ( nsize > osize ) collect_garbage();
 #endif // CLOX_GC_STRESS
   // puts("~ realloc: start");
   if ( nsize == 0 ) {

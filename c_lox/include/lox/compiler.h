@@ -348,11 +348,11 @@ void literal(bool) {
   case TOKEN_FALSE: emit_byte(OP_FALSE);         break;
   default:
     printf("Unknown literal type[%d]: %s -> '%.*s'\n",
-    parser.previous.type,
-    strtokentype(parser.previous.type),
-    parser.previous.length,
-    parser.previous.start
-  ); exit(1);
+      parser.previous.type,
+      strtokentype(parser.previous.type),
+      parser.previous.length,
+      parser.previous.start
+    ); exit(1);
   }
 }
 

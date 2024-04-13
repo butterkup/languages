@@ -50,7 +50,7 @@ fun churn_dots(runner, total) {
   print sum;
 }
 
-churn_dots(instance, nil);
+churn_dots(instance, 100000000);
 
 fun sum_of(n) { return (n * (n + 1)) / 2; }
 

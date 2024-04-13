@@ -112,7 +112,7 @@ int jump_instruction(Chunk* chunk, int sign, int offset) {
 }
 
 int invoke_instruction(Chunk* chunk, int offset) {
-  const char *name = inst_print(chunk->code[offset]);
+  const char* name = inst_print(chunk->code[offset]);
   uint8_t constant = chunk->code[++offset];
   uint8_t arg_count = chunk->code[++offset];
   printf("%-16s (%d args) '", name, arg_count);

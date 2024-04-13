@@ -223,7 +223,7 @@ void print_bound_method(ObjectBoundMethod* bound_method) {
 }
 
 void value_oprint(Value value) {
-  if ( !value.payload.object ) {
+  if (!AS_OBJECT(value)) {
     printf("(NULL OBJECT)");
     return;
   }
@@ -239,7 +239,7 @@ void value_oprint(Value value) {
   case OBJ_BOUND_METHOD: print_bound_method(AS_BOUND_METHOD(value));                     break;
   case OBJ_NATIVE: printf("<native fn(%s)>", AS_NATIVE_OBJ(value)->name);                break;
   case OBJ_INSTANCE: printf("<instance of %s>", AS_INSTANCE(value)->klass->name->chars); break;
-  default: printf("Unknown object[%p]: %d", value.payload.object, OBJECT_TYPE(value));   break;
+  default: printf("Unknown object[%p]: %d", value, OBJECT_TYPE(value));   break;
   }
 #ifdef CLOX_OBJECT_TYPE
   printf("\">");
@@ -247,7 +247,7 @@ void value_oprint(Value value) {
 }
 
 void object_delete(Object* object) {
-  if (!object) {
+  if ( !object ) {
     printf("Delete Object NULL detected.\n");
     exit(90);
   }

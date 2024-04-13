@@ -13,7 +13,7 @@ long double start_time();
 void define_native(const char*, NativeFn);
 
 Value clock_native(int arg_count, Value* args) {
-  if (arg_count != 0)
+  if ( arg_count != 0 )
     return ERROR_VAL("Did not expect any arguments.");
   // My clock.
   return NUMBER_VAL((long double)time(NULL) - start_time());
@@ -21,28 +21,27 @@ Value clock_native(int arg_count, Value* args) {
   // return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 
-Value exit_native(int arg_count, Value *args) {
-  if (arg_count > 1)
+Value exit_native(int arg_count, Value* args) {
+  if ( arg_count > 1 )
     return ERROR_VAL("exit expected one integer argument.");
-  if (arg_count == 0) exit(0);
-  else if (IS_NUMBER(*args)) {
+  if ( arg_count == 0 ) exit(0);
+  else if ( IS_NUMBER(*args) ) {
     double code = AS_NUMBER(*args);
-    if (code != (int)code)
+    if ( code != (int)code )
       return ERROR_VAL("Exit code must be a positive integer.");
     exit((int)code);
-  }
-  else return ERROR_VAL("Expected an integer exit code.");
+  } else return ERROR_VAL("Expected an integer exit code.");
   return NIL_VAL;
 }
 
-Value sleep_native(int arg_count, Value *args) {
-  if (arg_count != 1)
+Value sleep_native(int arg_count, Value* args) {
+  if ( arg_count != 1 )
     return ERROR_VAL("Expected one integer argument");
-  else if (IS_NUMBER(*args)) {
+  else if ( IS_NUMBER(*args) ) {
     double seconds = AS_NUMBER(*args);
-    if (seconds < 0)
+    if ( seconds < 0 )
       return ERROR_VAL("Seconds must be positive integer.");
-    if (seconds != (uint32_t)seconds)
+    if ( seconds != (uint32_t)seconds )
       return ERROR_VAL("Expected seconds to be an integer");
     sleep((uint32_t)seconds);
   } else return ERROR_VAL("Expected an integer seconds argument.");

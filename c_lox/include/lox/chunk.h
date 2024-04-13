@@ -49,46 +49,45 @@ typedef enum {
 
 #define INSTCS(inst) case OP##inst: return #inst + 1
 
-const char *inst_print(uint8_t byte) {
-  switch (byte)
-  {
-  INSTCS(_CLOSE_UPVALUE);
-  INSTCS(_JUMP_IF_FALSE);
-  INSTCS(_DEFINE_GLOBAL);
-  INSTCS(_SUPER_INVOKE);
-  INSTCS(_SET_PROPERTY);
-  INSTCS(_GET_PROPERTY);
-  INSTCS(_SET_UPVALUE);
-  INSTCS(_GET_UPVALUE);
-  INSTCS(_SET_GLOBAL);
-  INSTCS(_GET_GLOBAL);
-  INSTCS(_GET_SUPER);
-  INSTCS(_GET_LOCAL);
-  INSTCS(_SET_LOCAL);
-  INSTCS(_CONSTANT);
-  INSTCS(_SUBTRACT);
-  INSTCS(_MULTIPLY);
-  INSTCS(_INHERIT);
-  INSTCS(_GREATER);
-  INSTCS(_CLOSURE);
-  INSTCS(_INVOKE);
-  INSTCS(_METHOD);
-  INSTCS(_DIVIDE);
-  INSTCS(_RETURN);
-  INSTCS(_NEGATE);
-  INSTCS(_FALSE);
-  INSTCS(_EQUAL);
-  INSTCS(_PRINT);
-  INSTCS(_CLASS);
-  INSTCS(_TRUE);
-  INSTCS(_LESS);
-  INSTCS(_JUMP);
-  INSTCS(_LOOP);
-  INSTCS(_CALL);
-  INSTCS(_NIL);
-  INSTCS(_ADD);
-  INSTCS(_NOT);
-  INSTCS(_POP);
+const char* inst_print(uint8_t byte) {
+  switch ( byte ) {
+    INSTCS(_CLOSE_UPVALUE);
+    INSTCS(_JUMP_IF_FALSE);
+    INSTCS(_DEFINE_GLOBAL);
+    INSTCS(_SUPER_INVOKE);
+    INSTCS(_SET_PROPERTY);
+    INSTCS(_GET_PROPERTY);
+    INSTCS(_SET_UPVALUE);
+    INSTCS(_GET_UPVALUE);
+    INSTCS(_SET_GLOBAL);
+    INSTCS(_GET_GLOBAL);
+    INSTCS(_GET_SUPER);
+    INSTCS(_GET_LOCAL);
+    INSTCS(_SET_LOCAL);
+    INSTCS(_CONSTANT);
+    INSTCS(_SUBTRACT);
+    INSTCS(_MULTIPLY);
+    INSTCS(_INHERIT);
+    INSTCS(_GREATER);
+    INSTCS(_CLOSURE);
+    INSTCS(_INVOKE);
+    INSTCS(_METHOD);
+    INSTCS(_DIVIDE);
+    INSTCS(_RETURN);
+    INSTCS(_NEGATE);
+    INSTCS(_FALSE);
+    INSTCS(_EQUAL);
+    INSTCS(_PRINT);
+    INSTCS(_CLASS);
+    INSTCS(_TRUE);
+    INSTCS(_LESS);
+    INSTCS(_JUMP);
+    INSTCS(_LOOP);
+    INSTCS(_CALL);
+    INSTCS(_NIL);
+    INSTCS(_ADD);
+    INSTCS(_NOT);
+    INSTCS(_POP);
   }
   return "<UNKOWN_INST>";
 }
@@ -97,13 +96,13 @@ const char *inst_print(uint8_t byte) {
 
 typedef struct {
   ValueArray constants;
-  uint8_t *code; // Compiled Bytecode: from compile
+  uint8_t* code; // Compiled Bytecode: from compile
   int capacity;
-  int *lines;
+  int* lines;
   int count;
 } Chunk;
 
-void chunk_init(Chunk *chunk) {
+void chunk_init(Chunk* chunk) {
   value_init(&chunk->constants);
   chunk->capacity = 0;
   chunk->lines = NULL;
@@ -111,8 +110,8 @@ void chunk_init(Chunk *chunk) {
   chunk->count = 0;
 }
 
-void chunk_append(Chunk *chunk, uint8_t byte, int line) {
-  if (chunk->capacity < chunk->count + 1) {
+void chunk_append(Chunk* chunk, uint8_t byte, int line) {
+  if ( chunk->capacity < chunk->count + 1 ) {
     int capacity = chunk->capacity;
     chunk->capacity = GROW_CAPACITY(capacity);
     chunk->lines = GROW_ARRAY(int, chunk->lines, capacity, chunk->capacity);
@@ -123,13 +122,13 @@ void chunk_append(Chunk *chunk, uint8_t byte, int line) {
   chunk->count++;
 }
 
-void chunk_delete(Chunk *chunk) {
+void chunk_delete(Chunk* chunk) {
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
   FREE_ARRAY(int, chunk->lines, chunk->capacity);
   value_delete(&chunk->constants);
 }
 
-int chunk_cappend(Chunk *chunk, Value value) {
+int chunk_cappend(Chunk* chunk, Value value) {
   value_append(&chunk->constants, value);
   return chunk->constants.count - 1;
 }
