@@ -15,9 +15,9 @@ typedef  uint64_t Value;
 
 // WARNING: Do not change these constants
 // The value macros are calculated with them
-# define _QNAN      0x7f'fc'00'00'00'00'00'00 // 2nd to 13th are on
+# define _QNAN      0x7f'f8'00'00'00'00'00'00 // 2nd to 13th are on
 # define _SIGN_BIT  0x80'00'00'00'00'00'00'00 // 1 << 63   1st bit is on
-# define _ERROR_BIT 0x00'04'00'00'00'00'00'00 // 1 << 50   14th bit is on
+# define _ERROR_BIT 0x00'04'00'00'00'00'00'00 // 1 << 49   15th bit is on
 # define _TAG_NIL   1
 # define _TAG_FALSE 2
 # define _TAG_TRUE  3
